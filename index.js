@@ -12,7 +12,7 @@ const PASTEL_CHIPS = [
     "#ffc6ff", "#ffb3c6", "#b5ead7", "#f9c74f",
 ];
 
-const TABS = ["banned", "global", "detect", "inject", "settings"];
+const TABS = ["banned", "global", "detect", "settings"];
 const SEARCH_THRESHOLD = 10;   // show search/sort UI when list has ≥ this many items
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -727,9 +727,8 @@ function buildPanel() {
 
                 <div class="sk_tabs">
                     <button class="sk_tab_btn" data-tab="banned">금지어</button>
-                    <button class="sk_tab_btn" data-tab="global">🌐 글로벌</button>
+                    <button class="sk_tab_btn" data-tab="global">글로벌</button>
                     <button class="sk_tab_btn" data-tab="detect">감지</button>
-                    <button class="sk_tab_btn" data-tab="inject">주입 / 리롤</button>
                     <button class="sk_tab_btn" data-tab="settings">설정</button>
                 </div>
 
@@ -742,13 +741,13 @@ function buildPanel() {
 
                     <hr>
                     <h4>등록된 금지어</h4>
-                    <p class="sk_hint">아래에 직접 입력하거나, 위 목록에서 🚫를 누르세요. 칩의 ▲ 버튼을 누르면 글로벌로 옮길 수 있습니다.</p>
+                    <p class="sk_hint">위 목록에서 🚫를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
                     <div class="sk_ban_row">
                         <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
                         <button id="sk_ban_add" class="menu_button">추가</button>
                     </div>
                     <div id="sk_char_banned_filter" class="sk_filter" hidden>
-                        <input id="sk_char_banned_search" type="text" class="text_pole sk_search" placeholder="🔍 검색">
+                        <input id="sk_char_banned_search" type="text" class="text_pole sk_search" placeholder="검색">
                         <select id="sk_char_banned_sort" class="text_pole sk_sort">${SORT_OPTIONS}</select>
                     </div>
                     <div id="sk_banned_list" class="sk_chips"></div>
@@ -760,20 +759,20 @@ function buildPanel() {
 
                 <!-- 글로벌 -->
                 <div class="sk_tab_panel" data-tab="global" hidden>
-                    <h4>🌐 글로벌 금지어</h4>
+                    <h4>글로벌 금지어</h4>
                     <p class="sk_hint">모든 캐릭터에 적용됩니다. 캐릭터별 금지어와 합쳐서 동작합니다. ▼ 누르면 현재 캐릭터로 옮깁니다.</p>
                     <div class="sk_ban_row">
                         <input id="sk_global_ban_input" type="text" class="text_pole" placeholder="글로벌 금지어 입력">
                         <button id="sk_global_ban_add" class="menu_button">추가</button>
                     </div>
                     <div id="sk_global_banned_filter" class="sk_filter" hidden>
-                        <input id="sk_global_banned_search" type="text" class="text_pole sk_search" placeholder="🔍 검색">
+                        <input id="sk_global_banned_search" type="text" class="text_pole sk_search" placeholder="검색">
                         <select id="sk_global_banned_sort" class="text_pole sk_sort">${SORT_OPTIONS}</select>
                     </div>
                     <div id="sk_global_banned_list" class="sk_chips"></div>
 
                     <hr>
-                    <h4>🌐 글로벌 허용어</h4>
+                    <h4>글로벌 허용어</h4>
                     <p class="sk_hint">모든 캐릭터에서 '반복 아님'으로 제외됩니다.</p>
                     <div id="sk_global_allowed_list" class="sk_chips"></div>
                 </div>
@@ -789,26 +788,10 @@ function buildPanel() {
                     <input id="sk_threshold" type="range" min="2" max="15" value="${s.threshold}" class="sk_slider">
                     <label>훑어볼 범위 — 최근 <span id="sk_scanDepth_val">${s.scanDepth}</span>개 메시지</label>
                     <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
-
-                    <hr>
-                    <h4>하이라이트</h4>
-                    <label class="checkbox_label">
-                        <input id="sk_highlightEnabled" type="checkbox" ${s.highlightEnabled ? "checked" : ""}>
-                        <span>반복 표현 색칠</span>
-                    </label>
-                    <label>하이라이트 색상</label>
-                    <div class="sk_color_row">
-                        <div class="sk_color_preview" id="sk_color_preview" style="background:${s.highlightColor}"></div>
-                        <input id="sk_highlightColor" type="text" class="text_pole sk_color_input"
-                               value="${s.highlightColor}" placeholder="#rrggbb" maxlength="7" spellcheck="false">
-                    </div>
-                    <div class="sk_color_chips">
-                        ${PASTEL_CHIPS.map(c => `<button class="sk_color_chip" data-color="${c}" style="background:${c}" title="${c}"></button>`).join("")}
-                    </div>
                 </div>
 
-                <!-- 주입 / 리롤 -->
-                <div class="sk_tab_panel" data-tab="inject" hidden>
+                <!-- 설정 (주입 / 리롤 / 하이라이트 / 테마 통합) -->
+                <div class="sk_tab_panel" data-tab="settings" hidden>
                     <h4>프롬프트 주입</h4>
                     <label class="checkbox_label">
                         <input id="sk_injectEnabled" type="checkbox" ${s.injectEnabled ? "checked" : ""}>
@@ -840,10 +823,24 @@ function buildPanel() {
                     <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
                     <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
                     <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
-                </div>
 
-                <!-- 설정 -->
-                <div class="sk_tab_panel" data-tab="settings" hidden>
+                    <hr>
+                    <h4>하이라이트</h4>
+                    <label class="checkbox_label">
+                        <input id="sk_highlightEnabled" type="checkbox" ${s.highlightEnabled ? "checked" : ""}>
+                        <span>반복 표현 색칠</span>
+                    </label>
+                    <label>하이라이트 색상</label>
+                    <div class="sk_color_row">
+                        <div class="sk_color_preview" id="sk_color_preview" style="background:${s.highlightColor}"></div>
+                        <input id="sk_highlightColor" type="text" class="text_pole sk_color_input"
+                               value="${s.highlightColor}" placeholder="#rrggbb" maxlength="7" spellcheck="false">
+                    </div>
+                    <div class="sk_color_chips">
+                        ${PASTEL_CHIPS.map(c => `<button class="sk_color_chip" data-color="${c}" style="background:${c}" title="${c}"></button>`).join("")}
+                    </div>
+
+                    <hr>
                     <h4>테마</h4>
                     <div class="sk_theme_picker">
                         <button class="sk_theme_btn" data-theme="system" title="System (기본)"></button>
