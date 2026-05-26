@@ -588,7 +588,7 @@ function buildPanel() {
                 <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
 
                 <hr>
-                <h4>미리 알려주기 (프롬프트)</h4>
+                <h4>프롬프트 주입</h4>
                 <label class="checkbox_label">
                     <input id="sk_injectEnabled" type="checkbox" ${s.injectEnabled ? "checked" : ""}>
                     <span>사용</span>
@@ -596,7 +596,7 @@ function buildPanel() {
                 <label>한 번에 알려줄 표현 — 최대 <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
                 <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
                 <label>모델에게 보낼 문구</label>
-                <p class="sk_hint"><code>{{banned}}</code> 자리엔 등록한 금지어, <code>{{slop}}</code> 자리엔 자동으로 찾은 반복 표현, <code>{{phrases}}</code> 자리엔 둘 다 들어가요. 해당 목록이 비어 있으면 그 줄은 알아서 빠집니다.</p>
+                <p class="sk_hint"><code>{{banned}}</code> 자리엔 등록한 금지어, <code>{{slop}}</code> 자리엔 자동으로 찾은 반복 표현, <code>{{phrases}}</code> 자리엔 둘 다. 해당 목록이 비어 있으면 그 줄은 자동 생략됩니다.</p>
                 <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
                 <button id="sk_injectReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
 
@@ -604,17 +604,17 @@ function buildPanel() {
                 <h4>반복 페널티 올리기</h4>
                 <label class="checkbox_label">
                     <input id="sk_penaltyEnabled" type="checkbox" ${s.penaltyEnabled ? "checked" : ""}>
-                    <span>반복이 잡히면 frequency / presence penalty를 자동으로 올려줘요</span>
+                    <span>반복이 감지되면 frequency / presence penalty를 자동으로 올려줍니다</span>
                 </label>
-                <p class="sk_hint">오픈AI 호환 백엔드(예: DeepSeek, Groq, Mistral, OpenRouter, xAI 등)에서만 먹혀요. Gemini·Claude에서는 그냥 무시됩니다.</p>
+                <p class="sk_hint">오픈AI 호환 백엔드(예: DeepSeek, Groq, Mistral, OpenRouter, xAI 등)에서만 작동합니다. Gemini·Claude는 무시됩니다.</p>
                 <label>부스트 강도 — <span id="sk_penaltyBoost_val">${s.penaltyBoost}</span></label>
                 <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
 
                 <hr>
-                <h4>자동 다시쓰기</h4>
+                <h4>자동 리롤</h4>
                 <label class="checkbox_label">
                     <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
-                    <span>등록한 금지어가 답변에 나오면 알아서 다시 써줘요</span>
+                    <span>등록한 금지어가 답변에 나오면 자동으로 다시 생성합니다</span>
                 </label>
                 <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
                 <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
@@ -638,13 +638,13 @@ function buildPanel() {
 
                 <hr>
                 <h4>현재 캐릭터: <span id="sk_charname" style="color:var(--SmartThemeQuoteColor);"></span></h4>
-                <p class="sk_hint">자주 반복된 표현이에요 (많은 순). 🚫 누르면 금지어로 추가 · ✓ 누르면 반복 아님으로 제외</p>
+                <p class="sk_hint">자주 반복된 표현입니다 (많은 순). 🚫 누르면 금지어로 추가 · ✓ 누르면 반복 아님으로 제외</p>
                 <div id="sk_ranking" class="sk_ranking"></div>
                 <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
 
                 <hr>
                 <h4>등록된 금지어</h4>
-                <p class="sk_hint">위 목록에서 🚫를 누르거나, 아래 칸에 직접 입력해 추가할 수 있어요.</p>
+                <p class="sk_hint">위 목록에서 🚫를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
                 <div style="display:flex; gap:6px;">
                     <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력" style="flex:1;">
                     <button id="sk_ban_add" class="menu_button">추가</button>
@@ -777,11 +777,11 @@ function renderRanking() {
     const nameEl = document.getElementById("sk_charname");
     if (nameEl) nameEl.textContent = name || "(선택 안 됨)";
 
-    if (!name) { box.innerHTML = `<div class="sk_hint">먼저 캐릭터를 선택해 주세요</div>`; return; }
+    if (!name) { box.innerHTML = `<div class="sk_hint">캐릭터를 선택하세요</div>`; return; }
 
     const list = rankSlop();
     if (!list.length) {
-        box.innerHTML = `<div class="sk_hint">아직 반복된 표현이 없어요 (${getSettings().threshold}회 이상 반복되면 여기 떠요)</div>`;
+        box.innerHTML = `<div class="sk_hint">반복된 표현이 없습니다 (${getSettings().threshold}회 이상 반복되면 여기 표시됩니다)</div>`;
         return;
     }
 
