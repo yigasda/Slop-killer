@@ -30,6 +30,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     highlightColor: "#ff6b6b",
     penaltyEnabled: true,
     penaltyBoost: 0.3,  // added to freq/pres penalty on OpenAI-compatible backends
+    autoReroll: true,   // re-generate (via continue) when a banned phrase appears
+    rerollMax: 3,       // max continue attempts per message
     characters: {},     // charName -> { banned: [], allowed: [] }
 });
 
@@ -42,6 +44,11 @@ const PENALTY_BACKENDS = new Set([
 
 // Saved penalty values while a generation is in-flight; restored on GENERATION_ENDED.
 let _penaltyRestore = null;
+
+// Auto-reroll bookkeeping.
+let _rerollBusy = false;            // true while we are driving continue retries
+let _lastFreshId = null;            // id of the most recent freshly-generated reply
+const _rerollCount = new Map();     // mesId -> attempts already spent
 
 // Old default templates — auto-upgraded to the current default on load.
 const LEGACY_INJECT_TEMPLATES = new Set([
@@ -270,6 +277,81 @@ function restorePenalty() {
     _penaltyRestore.oai.freq_pen_openai = _penaltyRestore.freq;
     _penaltyRestore.oai.pres_pen_openai = _penaltyRestore.pres;
     _penaltyRestore = null;
+}
+
+// ====================================================================
+// Auto-reroll — when a banned phrase appears, truncate at the sentence
+// boundary before it and continue-generate from there (cheaper than a full
+// swipe; keeps all the good text preceding the offending passage).
+// ====================================================================
+
+// Index of the earliest banned-phrase match in text, or -1.
+function earliestBannedPos(text, phrases) {
+    const re = buildPhraseRegex(phrases);
+    if (!re) return -1;
+    re.lastIndex = 0;
+    const m = re.exec(text);
+    return m ? m.index : -1;
+}
+
+// Index just after the last sentence/line terminator before `idx`, or -1.
+function lastBoundaryBefore(text, idx) {
+    const slice = text.slice(0, idx);
+    const re = /[.!?…]["'”’)\]]*\s+|\n+/g;
+    let best = -1, m;
+    while ((m = re.exec(slice)) !== null) best = m.index + m[0].length;
+    return best;
+}
+
+// Returns the truncated message kept before the offending passage, or null
+// if there is nothing worth keeping (banned phrase at the very start).
+function truncateForReroll(text, phrases) {
+    const pos = earliestBannedPos(text, phrases);
+    if (pos < 0) return null;
+    const boundary = lastBoundaryBefore(text, pos);
+    const cut = boundary > 0 ? boundary : pos;   // fall back to mid-sentence cut
+    const kept = text.slice(0, cut).trimEnd();
+    return kept.length ? kept : null;
+}
+
+async function maybeReroll(rawId) {
+    const s = getSettings();
+    if (!s.enabled || !s.autoReroll || _rerollBusy) return;
+
+    const mesId = Number(rawId);
+    const c = ctx();
+    const chat = c.chat || [];
+    if (mesId !== chat.length - 1) return;            // only the freshest message
+    const msg = chat[mesId];
+    if (!msg || msg.is_user || msg.is_system) return;
+
+    const phrases = getCharData(getCurrentCharName()).banned.map(b => b.toLowerCase());
+    if (phrases.length === 0) return;
+    if (earliestBannedPos(msg.mes, phrases) < 0) return;
+
+    const spent = _rerollCount.get(mesId) || 0;
+    if (spent >= s.rerollMax) return;
+
+    _rerollBusy = true;
+    try {
+        let cur = msg;
+        for (let attempt = spent; attempt < s.rerollMax; attempt++) {
+            const kept = truncateForReroll(cur.mes, phrases);
+            if (kept === null) break;                 // nothing to salvage — leave as-is
+            cur.mes = kept;
+            c.updateMessageBlock(mesId, cur);
+            await c.saveChat();
+            _rerollCount.set(mesId, attempt + 1);
+            await c.executeSlashCommandsWithOptions("/continue");
+            cur = c.chat[mesId];                       // continue may replace the object
+            if (!cur || earliestBannedPos(cur.mes, phrases) < 0) break;
+        }
+    } catch (err) {
+        console.error("[SlopKiller] auto-reroll error:", err);
+    } finally {
+        _rerollBusy = false;
+        refreshAllHighlights();
+    }
 }
 
 // ====================================================================
@@ -524,6 +606,16 @@ function buildPanel() {
                 <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
 
                 <hr>
+                <h4>자동 리롤 (금지어 강제)</h4>
+                <label class="checkbox_label">
+                    <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
+                    <span>수동 금지어가 출력에 나오면 자동으로 다시 생성</span>
+                </label>
+                <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기(continue)로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
+                <label>최대 재시도 — <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
+                <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
+
+                <hr>
                 <h4>하이라이트</h4>
                 <label class="checkbox_label">
                     <input id="sk_highlightEnabled" type="checkbox" ${s.highlightEnabled ? "checked" : ""}>
@@ -607,6 +699,9 @@ function bindPanel() {
 
     bindCheckbox("sk_penaltyEnabled", "penaltyEnabled");
     bindSlider("sk_penaltyBoost", "penaltyBoost", parseFloat);
+
+    bindCheckbox("sk_autoReroll", "autoReroll");
+    bindSlider("sk_rerollMax", "rerollMax");
 
     bindCheckbox("sk_highlightEnabled", "highlightEnabled", refreshAllHighlights);
 
@@ -727,7 +822,18 @@ jQuery(() => {
         buildPanel();
         applyTheme();
 
-        eventSource.on(event_types.GENERATION_ENDED, restorePenalty);
+        // MESSAGE_RECEIVED fires only for freshly generated replies (not on chat
+        // load, not on abort), so we use it to mark which message is eligible for
+        // auto-reroll. The reroll itself runs after GENERATION_ENDED, deferred via
+        // setTimeout so the continue call isn't nested inside the generation pipeline.
+        eventSource.on(event_types.MESSAGE_RECEIVED, (mesId) => { _lastFreshId = Number(mesId); });
+        eventSource.on(event_types.GENERATION_ENDED, () => {
+            restorePenalty();
+            if (_lastFreshId === null) return;
+            const id = _lastFreshId;
+            _lastFreshId = null;
+            setTimeout(() => maybeReroll(id), 0);
+        });
 
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (mesId) => {
             highlightMessage(mesId);
@@ -735,6 +841,7 @@ jQuery(() => {
         });
         eventSource.on(event_types.MESSAGE_SWIPED, () => renderRanking());
         eventSource.on(event_types.CHAT_CHANGED, () => {
+            _rerollCount.clear();
             renderPanel();
             setTimeout(refreshAllHighlights, 300);
         });
