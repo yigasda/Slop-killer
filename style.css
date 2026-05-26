@@ -161,9 +161,64 @@
 /* ====================================================================
    Vertical rhythm
 ==================================================================== */
-#slop_killer_panel .inline-drawer-content {
-    padding-top: 6px;
+/* ====================================================================
+   Floating window — opened from the wand (magic-wand) menu
+==================================================================== */
+.sk_window {
+    position: fixed;
+    z-index: 9998;
+    width: min(430px, 94vw);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
 }
+
+.sk_window_header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 14px;
+    cursor: move;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.sk_window_title {
+    font-size: 1.0em;
+    font-weight: 700;
+}
+
+.sk_window_close {
+    cursor: pointer;
+    opacity: 0.55;
+    padding: 4px 6px;
+    border-radius: 6px;
+    font-size: 1.05em;
+    transition: opacity 120ms ease, background 120ms ease;
+}
+
+.sk_window_close:hover {
+    opacity: 1;
+    background: rgba(128, 128, 128, 0.2);
+}
+
+.sk_window_body {
+    overflow-y: auto;
+    padding: 4px 14px 16px;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.sk_window_body .sk_master_toggle {
+    margin-top: 4px;
+}
+
+/* Wand-menu launcher button */
+#sk_wand_button { cursor: pointer; }
 
 #slop_killer_panel h4 {
     margin: 22px 0 12px !important;
@@ -289,7 +344,7 @@ body[data-sk-theme] #slop_killer_panel hr {
 }
 
 /* Ban / allow action icons (Font Awesome, colored) */
-.sk_ic_ban   { color: #ec6a6a; }
+.sk_ic_ban   { color: #f5b9b9; }
 .sk_ic_allow { color: #555555; }
 
 /* ====================================================================
@@ -497,18 +552,19 @@ body[data-sk-theme="sky"] #slop_killer_panel {
     --sk-fw-bold: 700;
 }
 
-/* Apply variables to all active themes. */
-body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .inline-drawer-content {
+/* Apply variables to all active themes — the window surface + chrome. */
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel.sk_window {
     background: var(--sk-bg);
     color: var(--sk-text);
-    border-radius: var(--sk-radius-lg);
-    padding: 14px;
     font-weight: var(--sk-fw);
+    border: 1px solid var(--sk-border);
 }
 
-body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .inline-drawer-toggle {
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_window_header {
     color: var(--sk-text);
     font-weight: var(--sk-fw-bold);
+    border-bottom: 1px solid var(--sk-border);
+    background: var(--sk-bg-card);
 }
 
 body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel h4 {

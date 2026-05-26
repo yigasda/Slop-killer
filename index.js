@@ -709,18 +709,17 @@ const SORT_OPTIONS = `
 
 function buildPanel() {
     if (document.getElementById(`${MODULE_NAME}_panel`)) return;
-    const host = document.getElementById("extensions_settings2") || document.getElementById("extensions_settings");
+    const host = document.body;
     if (!host) return;
 
     const s = getSettings();
     const html = `
-    <div id="${MODULE_NAME}_panel" class="extension_settings">
-        <div class="inline-drawer">
-            <div class="inline-drawer-toggle inline-drawer-header">
-                <b>Slop Killer</b>
-                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
-            </div>
-            <div class="inline-drawer-content">
+    <div id="${MODULE_NAME}_panel" class="sk_window" style="display:none;">
+        <div class="sk_window_header">
+            <span class="sk_window_title">AI 반복 킬러</span>
+            <div class="sk_window_close fa-solid fa-xmark" title="닫기"></div>
+        </div>
+        <div class="sk_window_body">
 
                 <label class="checkbox_label sk_master_toggle">
                     <input id="sk_enabled" type="checkbox" ${s.enabled ? "checked" : ""}>
@@ -852,7 +851,6 @@ function buildPanel() {
                     </div>
                 </div>
 
-            </div>
         </div>
     </div>`;
 
@@ -1006,6 +1004,12 @@ function bindPanel() {
             save();
         });
     });
+
+    // Window chrome — close button + draggable header
+    const win = document.getElementById(`${MODULE_NAME}_panel`);
+    win.querySelector(".sk_window_close")?.addEventListener("click", closeWindow);
+    const header = win.querySelector(".sk_window_header");
+    if (header) makeDraggable(win, header);
 }
 
 function renderPanel() {
@@ -1206,6 +1210,85 @@ function initChatContextMenu() {
 }
 
 // ====================================================================
+// Floating window — opened from the wand (magic-wand) menu
+// ====================================================================
+function centerWindow(win) {
+    win.style.transform = "none";
+    const rect = win.getBoundingClientRect();
+    const w = rect.width || 430;
+    const h = rect.height || 400;
+    const left = Math.max(8, (window.innerWidth - w) / 2);
+    const top = Math.max(8, (window.innerHeight - h) / 2);
+    win.style.left = `${left}px`;
+    win.style.top = `${top}px`;
+}
+
+function openWindow() {
+    const win = document.getElementById(`${MODULE_NAME}_panel`);
+    if (!win) return;
+    win.style.display = "flex";
+    centerWindow(win);
+    renderPanel();
+    const menu = document.getElementById("extensionsMenu");
+    if (menu) menu.style.display = "none";
+}
+
+function closeWindow() {
+    const win = document.getElementById(`${MODULE_NAME}_panel`);
+    if (win) win.style.display = "none";
+}
+
+function toggleWindow() {
+    const win = document.getElementById(`${MODULE_NAME}_panel`);
+    if (!win) return;
+    if (win.style.display === "none" || !win.style.display) openWindow();
+    else closeWindow();
+}
+
+// Drag the window by its header (pointer events → works for mouse + touch).
+function makeDraggable(win, handle) {
+    let startX = 0, startY = 0, origLeft = 0, origTop = 0, dragging = false;
+    handle.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".sk_window_close")) return;
+        dragging = true;
+        const rect = win.getBoundingClientRect();
+        win.style.transform = "none";
+        win.style.left = `${rect.left}px`;
+        win.style.top = `${rect.top}px`;
+        startX = e.clientX; startY = e.clientY;
+        origLeft = rect.left; origTop = rect.top;
+        try { handle.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        e.preventDefault();
+    });
+    handle.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const nl = Math.max(0, Math.min(origLeft + (e.clientX - startX), window.innerWidth - 40));
+        const nt = Math.max(0, Math.min(origTop + (e.clientY - startY), window.innerHeight - 40));
+        win.style.left = `${nl}px`;
+        win.style.top = `${nt}px`;
+    });
+    const end = (e) => {
+        dragging = false;
+        try { handle.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+}
+
+function addWandButton() {
+    const menu = document.getElementById("extensionsMenu");
+    if (!menu || document.getElementById("sk_wand_button")) return;
+    const item = document.createElement("div");
+    item.id = "sk_wand_button";
+    item.className = "list-group-item flex-container flexGap5 interactable";
+    item.tabIndex = 0;
+    item.title = "AI 반복 킬러 열기";
+    item.innerHTML = `<i class="fa-solid fa-broom"></i><span>AI 반복 킬러</span>`;
+    item.addEventListener("click", openWindow);
+    menu.appendChild(item);
+}
+
+// ====================================================================
 // Init
 // ====================================================================
 jQuery(() => {
@@ -1217,6 +1300,15 @@ jQuery(() => {
         buildPanel();
         applyTheme();
         initChatContextMenu();
+        addWandButton();
+
+        // Escape closes the window (unless typing in a field).
+        document.addEventListener("keydown", (e) => {
+            if (e.key !== "Escape") return;
+            const t = e.target;
+            if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+            closeWindow();
+        });
 
         // MESSAGE_RECEIVED fires only for freshly generated replies (not on chat
         // load, not on abort), so we use it to mark which message is eligible for
