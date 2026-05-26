@@ -298,6 +298,14 @@ body[data-sk-theme] #slop_killer_panel hr {
     display: block;
 }
 
+/* Detect tab — more breathing room between slider groups */
+.sk_tab_panel[data-tab="detect"] label:not(.checkbox_label) {
+    margin-top: 24px;
+}
+.sk_tab_panel[data-tab="detect"] .sk_slider {
+    margin-bottom: 14px;
+}
+
 #slop_killer_panel input[type="color"] {
     width: 48px;
     height: 28px;
