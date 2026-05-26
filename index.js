@@ -93,6 +93,7 @@ function getSettings() {
         if (!Object.hasOwn(s, k)) s[k] = structuredClone(DEFAULT_SETTINGS[k]);
     }
     if (LEGACY_INJECT_TEMPLATES.has(s.injectTemplate)) s.injectTemplate = DEFAULT_SETTINGS.injectTemplate;
+    if (s.theme === "system") s.theme = "cream";
     return s;
 }
 
@@ -794,7 +795,6 @@ function buildPanel() {
                 <div class="sk_tab_panel" data-tab="settings" hidden>
                     <h4>테마</h4>
                     <div class="sk_theme_picker">
-                        <button class="sk_theme_btn" data-theme="system" title="System (기본)"></button>
                         <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
                         <button class="sk_theme_btn" data-theme="cream"  title="Cream (베이지)"></button>
                         <button class="sk_theme_btn" data-theme="peach"  title="Peach (피치)"></button>

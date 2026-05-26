@@ -97,7 +97,7 @@
 #slop_killer_panel hr {
     border: none;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    margin: 6px 0 2px;
+    margin: 18px 0 6px;
 }
 
 #slop_killer_panel label:not(.checkbox_label) {
@@ -304,7 +304,6 @@
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
-.sk_theme_btn[data-theme="system"] { background: #f0c8a8; }
 .sk_theme_btn[data-theme="mono"]   { background: #c8ccd8; }
 .sk_theme_btn[data-theme="cream"]  { background: #f5e5b8; }
 .sk_theme_btn[data-theme="peach"]  { background: #f5c0b0; }
@@ -396,7 +395,7 @@ body[data-sk-theme="lilac"] #slop_killer_panel {
     --sk-fw-bold: 600;
 }
 
-/* Apply variables — every theme except "system" (which stays native). */
+/* Apply variables to all active themes. */
 body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .inline-drawer-content {
     background: var(--sk-bg);
     color: var(--sk-text);
@@ -425,7 +424,7 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_hint {
 
 body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel hr {
     border-top: 1px solid var(--sk-border) !important;
-    margin: 6px 0 2px !important;
+    margin: 18px 0 6px !important;
 }
 
 body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .text_pole {
