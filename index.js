@@ -12,6 +12,9 @@ const PASTEL_CHIPS = [
     "#ffc6ff", "#ffb3c6", "#b5ead7", "#f9c74f",
 ];
 
+const TABS = ["banned", "global", "detect", "inject", "settings"];
+const SEARCH_THRESHOLD = 10;   // show search/sort UI when list has ≥ this many items
+
 const DEFAULT_SETTINGS = Object.freeze({
     enabled: true,
     theme: "cream",     // system | mono | cream | peach | lilac
@@ -33,6 +36,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     autoReroll: true,   // re-generate (via continue) when a banned phrase appears
     rerollMax: 3,       // max continue attempts per message
     characters: {},     // charName -> { banned: [], allowed: [] }
+    global: { banned: [], allowed: [] },   // applied across every character
+    activeTab: "banned",                   // remembered between sessions
 });
 
 // Backends that support freq_pen_openai / pres_pen_openai in oai_settings.
@@ -49,6 +54,12 @@ let _penaltyRestore = null;
 let _rerollBusy = false;            // true while we are driving continue retries
 let _lastFreshId = null;            // id of the most recent freshly-generated reply
 const _rerollCount = new Map();     // mesId -> attempts already spent
+
+// Search + sort state per scope (persists across re-renders within a session).
+const _filter = {
+    charBanned:   { q: "", sort: "added" },
+    globalBanned: { q: "", sort: "added" },
+};
 
 // Old default templates — auto-upgraded to the current default on load.
 const LEGACY_INJECT_TEMPLATES = new Set([
@@ -69,6 +80,8 @@ const STOPWORDS = new Set((
 // Context helpers
 // ====================================================================
 function ctx() { return SillyTavern.getContext(); }
+
+function normalizePhrase(p) { return String(p).toLowerCase().trim(); }
 
 function getSettings() {
     const { extensionSettings } = ctx();
@@ -98,6 +111,38 @@ function getCharData(name) {
     if (!Array.isArray(d.banned)) d.banned = [];
     if (!Array.isArray(d.allowed)) d.allowed = [];
     return d;
+}
+
+function getGlobal() {
+    const s = getSettings();
+    if (!s.global || typeof s.global !== "object") s.global = { banned: [], allowed: [] };
+    if (!Array.isArray(s.global.banned)) s.global.banned = [];
+    if (!Array.isArray(s.global.allowed)) s.global.allowed = [];
+    return s.global;
+}
+
+// Global ∪ character, deduped and normalized. Used everywhere a "effective"
+// ban/allow list is needed (injection, highlight, reroll, ranking).
+function mergedBanned() {
+    const cd = getCharData(getCurrentCharName());
+    const g = getGlobal();
+    const seen = new Set(), out = [];
+    for (const p of [...g.banned, ...cd.banned]) {
+        const k = normalizePhrase(p);
+        if (k && !seen.has(k)) { seen.add(k); out.push(k); }
+    }
+    return out;
+}
+
+function mergedAllowed() {
+    const cd = getCharData(getCurrentCharName());
+    const g = getGlobal();
+    const seen = new Set(), out = [];
+    for (const p of [...g.allowed, ...cd.allowed]) {
+        const k = normalizePhrase(p);
+        if (k && !seen.has(k)) { seen.add(k); out.push(k); }
+    }
+    return out;
 }
 
 // ====================================================================
@@ -136,6 +181,26 @@ function computeCounts() {
     return counts;
 }
 
+// Direct regex count of a (possibly long) phrase in recent AI messages.
+// Used for the "현재 채팅 등장 횟수" sort, where a banned phrase may be longer
+// than maxN and therefore absent from the n-gram count map.
+function countOccurrencesInChat(phrase) {
+    const s = getSettings();
+    const chat = ctx().chat || [];
+    const msgs = chat.filter(m =>
+        m && !m.is_user && !m.is_system && typeof m.mes === "string" && m.mes.trim()
+    ).slice(-s.scanDepth);
+    const needle = String(phrase).trim();
+    if (!needle) return 0;
+    const re = new RegExp(escapeRe(needle), "gi");
+    let n = 0;
+    for (const m of msgs) {
+        const matches = m.mes.match(re);
+        if (matches) n += matches.length;
+    }
+    return n;
+}
+
 // True if two phrases belong to the same repeated run (containment or a
 // boundary shift of >= 2 shared words — e.g. sliding-window fragments).
 function overlaps(a, b) {
@@ -152,8 +217,7 @@ function overlaps(a, b) {
 // overlaps an allowed phrase, so ✓ clears the whole run). Sorted by count.
 function aboveThreshold() {
     const s = getSettings();
-    const cd = getCharData(getCurrentCharName());
-    const allowed = cd.allowed.map(x => x.toLowerCase());
+    const allowed = mergedAllowed();
     return [...computeCounts().entries()]
         .filter(([p, c]) =>
             c >= s.threshold &&
@@ -193,7 +257,7 @@ function mergeChains(entries) {
 // Already-banned phrases (and fragments overlapping them) are dropped so the
 // ranking only shows phrases that haven't been categorized yet.
 function rankSlop() {
-    const banned = getCharData(getCurrentCharName()).banned.map(x => x.toLowerCase());
+    const banned = mergedBanned();
     const isBanned = p => banned.includes(p) || banned.some(b => overlaps(b, p));
     const merged = mergeChains(aboveThreshold())
         .sort((a, b) => b.count - a.count || b.phrase.length - a.phrase.length);
@@ -209,16 +273,15 @@ function rankSlop() {
 // Injection lists, split by source: manual banned (strict) vs auto-detected
 // slop (soft). Deduped against each other; banned takes priority in the cap.
 function injectionLists(cap) {
-    const cd = getCharData(getCurrentCharName());
     const seen = new Set();
     const collect = (src, into) => {
         for (const p of src) {
-            const k = String(p).toLowerCase().trim();
+            const k = normalizePhrase(p);
             if (k && !seen.has(k)) { seen.add(k); into.push(k); }
         }
     };
     const banned = [];
-    collect(cd.banned, banned);
+    collect(mergedBanned(), banned);
     const slop = [];
     collect(rankSlop().map(x => x.phrase), slop);
     if (!cap) return { banned, slop };
@@ -253,13 +316,12 @@ function buildInjectionText(template, banned, slop) {
 // Highlight set = manual banned ∪ all above-threshold n-grams (broad coverage
 // so a whole repeated passage gets colored, not just one fragment).
 function highlightPhrases() {
-    const cd = getCharData(getCurrentCharName());
     const out = [];
     const push = (p) => {
-        const k = String(p).toLowerCase().trim();
+        const k = normalizePhrase(p);
         if (k && !out.includes(k)) out.push(k);
     };
-    cd.banned.forEach(push);
+    mergedBanned().forEach(push);
     aboveThreshold().forEach(([p]) => push(p));
     return out;
 }
@@ -330,7 +392,7 @@ async function maybeReroll(rawId) {
     const msg = chat[mesId];
     if (!msg || msg.is_user || msg.is_system) return;
 
-    const phrases = getCharData(getCurrentCharName()).banned.map(b => b.toLowerCase());
+    const phrases = mergedBanned();
     if (phrases.length === 0) return;
     if (earliestBannedPos(msg.mes, phrases) < 0) return;
 
@@ -502,10 +564,8 @@ function applyTheme() {
 }
 
 // ====================================================================
-// Manual ban / allow actions
+// Ban / allow actions — per-character and global, plus promote/demote
 // ====================================================================
-function normalizePhrase(p) { return String(p).toLowerCase().trim(); }
-
 function addBanned(phrase) {
     const p = normalizePhrase(phrase);
     if (!p) return;
@@ -538,6 +598,99 @@ function removeFrom(kind, phrase) {
     refreshAllHighlights();
 }
 
+function addBannedGlobal(phrase) {
+    const p = normalizePhrase(phrase);
+    if (!p) return;
+    const g = getGlobal();
+    g.allowed = g.allowed.filter(x => normalizePhrase(x) !== p);
+    if (!g.banned.some(x => normalizePhrase(x) === p)) g.banned.push(p);
+    save();
+    renderPanel();
+    refreshAllHighlights();
+}
+
+function addAllowedGlobal(phrase) {
+    const p = normalizePhrase(phrase);
+    if (!p) return;
+    const g = getGlobal();
+    g.banned = g.banned.filter(x => normalizePhrase(x) !== p);
+    if (!g.allowed.some(x => normalizePhrase(x) === p)) g.allowed.push(p);
+    save();
+    renderPanel();
+    refreshAllHighlights();
+}
+
+function removeFromGlobal(kind, phrase) {
+    const p = normalizePhrase(phrase);
+    const g = getGlobal();
+    if (kind === "banned") g.banned = g.banned.filter(x => normalizePhrase(x) !== p);
+    else g.allowed = g.allowed.filter(x => normalizePhrase(x) !== p);
+    save();
+    renderPanel();
+    refreshAllHighlights();
+}
+
+// Move a phrase from current-character list → global list (or vice versa).
+// Idempotent: dedupes at the destination, removes from the source.
+function promoteToGlobal(phrase, kind) {
+    const p = normalizePhrase(phrase);
+    if (!p) return;
+    const cd = getCharData(getCurrentCharName());
+    const g = getGlobal();
+    if (kind === "banned") {
+        cd.banned = cd.banned.filter(x => normalizePhrase(x) !== p);
+        if (!g.banned.some(x => normalizePhrase(x) === p)) g.banned.push(p);
+    } else {
+        cd.allowed = cd.allowed.filter(x => normalizePhrase(x) !== p);
+        if (!g.allowed.some(x => normalizePhrase(x) === p)) g.allowed.push(p);
+    }
+    save();
+    renderPanel();
+    refreshAllHighlights();
+}
+
+function demoteToCharacter(phrase, kind) {
+    const p = normalizePhrase(phrase);
+    const name = getCurrentCharName();
+    if (!p) return;
+    if (!name) {
+        toastr?.warning?.("캐릭터가 선택되지 않았습니다");
+        return;
+    }
+    const cd = getCharData(name);
+    const g = getGlobal();
+    if (kind === "banned") {
+        g.banned = g.banned.filter(x => normalizePhrase(x) !== p);
+        if (!cd.banned.some(x => normalizePhrase(x) === p)) cd.banned.push(p);
+    } else {
+        g.allowed = g.allowed.filter(x => normalizePhrase(x) !== p);
+        if (!cd.allowed.some(x => normalizePhrase(x) === p)) cd.allowed.push(p);
+    }
+    save();
+    renderPanel();
+    refreshAllHighlights();
+}
+
+// ====================================================================
+// Filter + sort for chip lists
+// ====================================================================
+function applyFilterSort(list, q, sort) {
+    let arr = [...list];
+    if (q) {
+        const needle = q.toLowerCase();
+        arr = arr.filter(p => String(p).toLowerCase().includes(needle));
+    }
+    if (sort === "alpha") {
+        arr.sort((a, b) => String(a).localeCompare(String(b)));
+    } else if (sort === "count") {
+        const counted = arr.map(p => [p, countOccurrencesInChat(p)]);
+        counted.sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+        arr = counted.map(x => x[0]);
+    }
+    // "added" — keep insertion order
+    return arr;
+}
+
 // ====================================================================
 // Settings panel
 // ====================================================================
@@ -545,6 +698,12 @@ function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c =>
         ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+
+const SORT_OPTIONS = `
+    <option value="added">추가순</option>
+    <option value="alpha">알파벳</option>
+    <option value="count">현재 채팅 등장순</option>
+`;
 
 function buildPanel() {
     if (document.getElementById(`${MODULE_NAME}_panel`)) return;
@@ -561,98 +720,139 @@ function buildPanel() {
             </div>
             <div class="inline-drawer-content">
 
-                <label class="checkbox_label">
+                <label class="checkbox_label sk_master_toggle">
                     <input id="sk_enabled" type="checkbox" ${s.enabled ? "checked" : ""}>
                     <span>확장 활성화</span>
                 </label>
 
-                <hr>
-                <h4>테마</h4>
-                <div class="sk_theme_picker">
-                    <button class="sk_theme_btn" data-theme="system" title="System (기본)"></button>
-                    <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
-                    <button class="sk_theme_btn" data-theme="cream"  title="Cream (베이지)"></button>
-                    <button class="sk_theme_btn" data-theme="peach"  title="Peach (피치)"></button>
-                    <button class="sk_theme_btn" data-theme="lilac"  title="Lilac (연보라)"></button>
+                <div class="sk_tabs">
+                    <button class="sk_tab_btn" data-tab="banned">금지어</button>
+                    <button class="sk_tab_btn" data-tab="global">🌐 글로벌</button>
+                    <button class="sk_tab_btn" data-tab="detect">감지</button>
+                    <button class="sk_tab_btn" data-tab="inject">주입 / 리롤</button>
+                    <button class="sk_tab_btn" data-tab="settings">설정</button>
                 </div>
 
-                <hr>
-                <h4>감지 설정</h4>
-                <label>표현 길이 — 최소 <span id="sk_minN_val">${s.minN}</span> 단어</label>
-                <input id="sk_minN" type="range" min="1" max="5" value="${s.minN}" class="sk_slider">
-                <label>표현 길이 — 최대 <span id="sk_maxN_val">${s.maxN}</span> 단어</label>
-                <input id="sk_maxN" type="range" min="1" max="6" value="${s.maxN}" class="sk_slider">
-                <label>반복으로 볼 기준 — <span id="sk_threshold_val">${s.threshold}</span>회 이상</label>
-                <input id="sk_threshold" type="range" min="2" max="15" value="${s.threshold}" class="sk_slider">
-                <label>훑어볼 범위 — 최근 <span id="sk_scanDepth_val">${s.scanDepth}</span>개 메시지</label>
-                <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
+                <!-- 금지어 (캐릭터별) -->
+                <div class="sk_tab_panel" data-tab="banned">
+                    <h4>현재 캐릭터: <span id="sk_charname" class="sk_charname"></span></h4>
+                    <p class="sk_hint">자주 반복된 표현입니다 (많은 순). 🚫 누르면 금지어로 추가 · ✓ 누르면 반복 아님으로 제외</p>
+                    <div id="sk_ranking" class="sk_ranking"></div>
+                    <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
 
-                <hr>
-                <h4>프롬프트 주입</h4>
-                <label class="checkbox_label">
-                    <input id="sk_injectEnabled" type="checkbox" ${s.injectEnabled ? "checked" : ""}>
-                    <span>사용</span>
-                </label>
-                <label>한 번에 알려줄 표현 — 최대 <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
-                <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
-                <label>모델에게 보낼 문구</label>
-                <p class="sk_hint"><code>{{banned}}</code> 자리엔 등록한 금지어, <code>{{slop}}</code> 자리엔 자동으로 찾은 반복 표현, <code>{{phrases}}</code> 자리엔 둘 다. 해당 목록이 비어 있으면 그 줄은 자동 생략됩니다.</p>
-                <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
-                <button id="sk_injectReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
+                    <hr>
+                    <h4>등록된 금지어</h4>
+                    <p class="sk_hint">아래에 직접 입력하거나, 위 목록에서 🚫를 누르세요. 칩의 ▲ 버튼을 누르면 글로벌로 옮길 수 있습니다.</p>
+                    <div class="sk_ban_row">
+                        <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
+                        <button id="sk_ban_add" class="menu_button">추가</button>
+                    </div>
+                    <div id="sk_char_banned_filter" class="sk_filter" hidden>
+                        <input id="sk_char_banned_search" type="text" class="text_pole sk_search" placeholder="🔍 검색">
+                        <select id="sk_char_banned_sort" class="text_pole sk_sort">${SORT_OPTIONS}</select>
+                    </div>
+                    <div id="sk_banned_list" class="sk_chips"></div>
 
-                <hr>
-                <h4>반복 페널티 올리기</h4>
-                <label class="checkbox_label">
-                    <input id="sk_penaltyEnabled" type="checkbox" ${s.penaltyEnabled ? "checked" : ""}>
-                    <span>반복이 감지되면 frequency / presence penalty를 자동으로 올려줍니다</span>
-                </label>
-                <p class="sk_hint">오픈AI 호환 백엔드(예: OpenRouter, DeepSeek, Moonshot 등)에서만 작동합니다. Gemini·Claude는 무시됩니다.</p>
-                <label>부스트 강도 — <span id="sk_penaltyBoost_val">${s.penaltyBoost}</span></label>
-                <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
-
-                <hr>
-                <h4>자동 리롤</h4>
-                <label class="checkbox_label">
-                    <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
-                    <span>등록한 금지어가 답변에 나오면 자동으로 다시 생성합니다</span>
-                </label>
-                <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
-                <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
-                <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
-
-                <hr>
-                <h4>하이라이트</h4>
-                <label class="checkbox_label">
-                    <input id="sk_highlightEnabled" type="checkbox" ${s.highlightEnabled ? "checked" : ""}>
-                    <span>반복 표현 색칠</span>
-                </label>
-                <label>하이라이트 색상</label>
-                <div class="sk_color_row">
-                    <div class="sk_color_preview" id="sk_color_preview" style="background:${s.highlightColor}"></div>
-                    <input id="sk_highlightColor" type="text" class="text_pole sk_color_input"
-                           value="${s.highlightColor}" placeholder="#rrggbb" maxlength="7" spellcheck="false">
-                </div>
-                <div class="sk_color_chips">
-                    ${PASTEL_CHIPS.map(c => `<button class="sk_color_chip" data-color="${c}" style="background:${c}" title="${c}"></button>`).join("")}
+                    <hr>
+                    <h4>허용어 (반복 아님)</h4>
+                    <div id="sk_allowed_list" class="sk_chips"></div>
                 </div>
 
-                <hr>
-                <h4>현재 캐릭터: <span id="sk_charname" class="sk_charname"></span></h4>
-                <p class="sk_hint">자주 반복된 표현입니다 (많은 순). 🚫 누르면 금지어로 추가 · ✓ 누르면 반복 아님으로 제외</p>
-                <div id="sk_ranking" class="sk_ranking"></div>
-                <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
+                <!-- 글로벌 -->
+                <div class="sk_tab_panel" data-tab="global" hidden>
+                    <h4>🌐 글로벌 금지어</h4>
+                    <p class="sk_hint">모든 캐릭터에 적용됩니다. 캐릭터별 금지어와 합쳐서 동작합니다. ▼ 누르면 현재 캐릭터로 옮깁니다.</p>
+                    <div class="sk_ban_row">
+                        <input id="sk_global_ban_input" type="text" class="text_pole" placeholder="글로벌 금지어 입력">
+                        <button id="sk_global_ban_add" class="menu_button">추가</button>
+                    </div>
+                    <div id="sk_global_banned_filter" class="sk_filter" hidden>
+                        <input id="sk_global_banned_search" type="text" class="text_pole sk_search" placeholder="🔍 검색">
+                        <select id="sk_global_banned_sort" class="text_pole sk_sort">${SORT_OPTIONS}</select>
+                    </div>
+                    <div id="sk_global_banned_list" class="sk_chips"></div>
 
-                <hr>
-                <h4>등록된 금지어</h4>
-                <p class="sk_hint">위 목록에서 🚫를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
-                <div class="sk_ban_row">
-                    <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
-                    <button id="sk_ban_add" class="menu_button">추가</button>
+                    <hr>
+                    <h4>🌐 글로벌 허용어</h4>
+                    <p class="sk_hint">모든 캐릭터에서 '반복 아님'으로 제외됩니다.</p>
+                    <div id="sk_global_allowed_list" class="sk_chips"></div>
                 </div>
-                <div id="sk_banned_list" class="sk_chips"></div>
 
-                <h4>허용어 (반복 아님)</h4>
-                <div id="sk_allowed_list" class="sk_chips"></div>
+                <!-- 감지 -->
+                <div class="sk_tab_panel" data-tab="detect" hidden>
+                    <h4>감지 설정</h4>
+                    <label>표현 길이 — 최소 <span id="sk_minN_val">${s.minN}</span> 단어</label>
+                    <input id="sk_minN" type="range" min="1" max="5" value="${s.minN}" class="sk_slider">
+                    <label>표현 길이 — 최대 <span id="sk_maxN_val">${s.maxN}</span> 단어</label>
+                    <input id="sk_maxN" type="range" min="1" max="6" value="${s.maxN}" class="sk_slider">
+                    <label>반복으로 볼 기준 — <span id="sk_threshold_val">${s.threshold}</span>회 이상</label>
+                    <input id="sk_threshold" type="range" min="2" max="15" value="${s.threshold}" class="sk_slider">
+                    <label>훑어볼 범위 — 최근 <span id="sk_scanDepth_val">${s.scanDepth}</span>개 메시지</label>
+                    <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
+
+                    <hr>
+                    <h4>하이라이트</h4>
+                    <label class="checkbox_label">
+                        <input id="sk_highlightEnabled" type="checkbox" ${s.highlightEnabled ? "checked" : ""}>
+                        <span>반복 표현 색칠</span>
+                    </label>
+                    <label>하이라이트 색상</label>
+                    <div class="sk_color_row">
+                        <div class="sk_color_preview" id="sk_color_preview" style="background:${s.highlightColor}"></div>
+                        <input id="sk_highlightColor" type="text" class="text_pole sk_color_input"
+                               value="${s.highlightColor}" placeholder="#rrggbb" maxlength="7" spellcheck="false">
+                    </div>
+                    <div class="sk_color_chips">
+                        ${PASTEL_CHIPS.map(c => `<button class="sk_color_chip" data-color="${c}" style="background:${c}" title="${c}"></button>`).join("")}
+                    </div>
+                </div>
+
+                <!-- 주입 / 리롤 -->
+                <div class="sk_tab_panel" data-tab="inject" hidden>
+                    <h4>프롬프트 주입</h4>
+                    <label class="checkbox_label">
+                        <input id="sk_injectEnabled" type="checkbox" ${s.injectEnabled ? "checked" : ""}>
+                        <span>사용</span>
+                    </label>
+                    <label>한 번에 알려줄 표현 — 최대 <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
+                    <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
+                    <label>모델에게 보낼 문구</label>
+                    <p class="sk_hint"><code>{{banned}}</code> 자리엔 등록한 금지어, <code>{{slop}}</code> 자리엔 자동으로 찾은 반복 표현, <code>{{phrases}}</code> 자리엔 둘 다. 해당 목록이 비어 있으면 그 줄은 자동 생략됩니다.</p>
+                    <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
+                    <button id="sk_injectReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
+
+                    <hr>
+                    <h4>반복 페널티 올리기</h4>
+                    <label class="checkbox_label">
+                        <input id="sk_penaltyEnabled" type="checkbox" ${s.penaltyEnabled ? "checked" : ""}>
+                        <span>반복이 감지되면 frequency / presence penalty를 자동으로 올려줍니다</span>
+                    </label>
+                    <p class="sk_hint">오픈AI 호환 백엔드(예: OpenRouter, DeepSeek, Moonshot 등)에서만 작동합니다. Gemini·Claude는 무시됩니다.</p>
+                    <label>부스트 강도 — <span id="sk_penaltyBoost_val">${s.penaltyBoost}</span></label>
+                    <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
+
+                    <hr>
+                    <h4>자동 리롤</h4>
+                    <label class="checkbox_label">
+                        <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
+                        <span>등록한 금지어가 답변에 나오면 자동으로 다시 생성합니다</span>
+                    </label>
+                    <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
+                    <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
+                    <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
+                </div>
+
+                <!-- 설정 -->
+                <div class="sk_tab_panel" data-tab="settings" hidden>
+                    <h4>테마</h4>
+                    <div class="sk_theme_picker">
+                        <button class="sk_theme_btn" data-theme="system" title="System (기본)"></button>
+                        <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
+                        <button class="sk_theme_btn" data-theme="cream"  title="Cream (베이지)"></button>
+                        <button class="sk_theme_btn" data-theme="peach"  title="Peach (피치)"></button>
+                        <button class="sk_theme_btn" data-theme="lilac"  title="Lilac (연보라)"></button>
+                    </div>
+                </div>
 
             </div>
         </div>
@@ -660,7 +860,23 @@ function buildPanel() {
 
     host.insertAdjacentHTML("beforeend", html);
     bindPanel();
+    switchTab(s.activeTab || "banned");
     renderPanel();
+}
+
+function switchTab(tabName) {
+    const tab = TABS.includes(tabName) ? tabName : "banned";
+    document.querySelectorAll("#slop_killer_panel .sk_tab_btn").forEach(btn => {
+        btn.classList.toggle("sk_tab_active", btn.dataset.tab === tab);
+    });
+    document.querySelectorAll("#slop_killer_panel .sk_tab_panel").forEach(p => {
+        p.hidden = p.dataset.tab !== tab;
+    });
+    const s = getSettings();
+    if (s.activeTab !== tab) {
+        s.activeTab = tab;
+        save();
+    }
 }
 
 function bindPanel() {
@@ -668,6 +884,7 @@ function bindPanel() {
 
     const bindCheckbox = (id, key, after) => {
         const el = document.getElementById(id);
+        if (!el) return;
         el.addEventListener("change", () => {
             s[key] = el.checked;
             save();
@@ -678,6 +895,7 @@ function bindPanel() {
     const bindSlider = (id, key, parser = parseInt, after) => {
         const el = document.getElementById(id);
         const lbl = document.getElementById(`${id}_val`);
+        if (!el) return;
         el.addEventListener("input", () => {
             s[key] = parser(el.value);
             if (lbl) lbl.textContent = el.value;
@@ -750,11 +968,39 @@ function bindPanel() {
         refreshAllHighlights();
     });
 
+    // Character-scope ban input
     const banInput = document.getElementById("sk_ban_input");
-    const doAdd = () => { if (banInput.value.trim()) { addBanned(banInput.value); banInput.value = ""; } };
-    document.getElementById("sk_ban_add").addEventListener("click", doAdd);
-    banInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+    const doAddChar = () => { if (banInput.value.trim()) { addBanned(banInput.value); banInput.value = ""; } };
+    document.getElementById("sk_ban_add").addEventListener("click", doAddChar);
+    banInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAddChar(); });
 
+    // Global-scope ban input
+    const globalBanInput = document.getElementById("sk_global_ban_input");
+    const doAddGlobal = () => {
+        if (globalBanInput.value.trim()) { addBannedGlobal(globalBanInput.value); globalBanInput.value = ""; }
+    };
+    document.getElementById("sk_global_ban_add").addEventListener("click", doAddGlobal);
+    globalBanInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAddGlobal(); });
+
+    // Search + sort
+    const bindFilter = (searchId, sortId, state) => {
+        const sEl = document.getElementById(searchId);
+        const sortEl = document.getElementById(sortId);
+        if (!sEl || !sortEl) return;
+        sEl.value = state.q;
+        sortEl.value = state.sort;
+        sEl.addEventListener("input", () => { state.q = sEl.value; renderChips(); });
+        sortEl.addEventListener("change", () => { state.sort = sortEl.value; renderChips(); });
+    };
+    bindFilter("sk_char_banned_search", "sk_char_banned_sort", _filter.charBanned);
+    bindFilter("sk_global_banned_search", "sk_global_banned_sort", _filter.globalBanned);
+
+    // Tabs
+    document.querySelectorAll("#slop_killer_panel .sk_tab_btn").forEach(btn => {
+        btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+
+    // Theme
     document.querySelectorAll("#slop_killer_panel .sk_theme_btn").forEach(btn => {
         btn.addEventListener("click", () => {
             s.theme = btn.dataset.theme;
@@ -801,19 +1047,59 @@ function renderRanking() {
 
 function renderChips() {
     const cd = getCharData(getCurrentCharName());
-    renderChipBox("sk_banned_list", cd.banned, "banned");
-    renderChipBox("sk_allowed_list", cd.allowed, "allowed");
+    const g = getGlobal();
+
+    setHidden("sk_char_banned_filter", cd.banned.length < SEARCH_THRESHOLD);
+    setHidden("sk_global_banned_filter", g.banned.length < SEARCH_THRESHOLD);
+
+    renderChipBox("sk_banned_list",        cd.banned,  "banned",  "char",   _filter.charBanned);
+    renderChipBox("sk_allowed_list",       cd.allowed, "allowed", "char",   null);
+    renderChipBox("sk_global_banned_list", g.banned,   "banned",  "global", _filter.globalBanned);
+    renderChipBox("sk_global_allowed_list",g.allowed,  "allowed", "global", null);
 }
 
-function renderChipBox(id, arr, kind) {
+function setHidden(id, hidden) {
+    const el = document.getElementById(id);
+    if (el) el.hidden = !!hidden;
+}
+
+// kind:  "banned" | "allowed"
+// scope: "char"   | "global"
+function renderChipBox(id, list, kind, scope, filter) {
     const box = document.getElementById(id);
     if (!box) return;
-    if (!arr.length) { box.innerHTML = `<span class="sk_hint">없음</span>`; return; }
-    box.innerHTML = arr.map(p =>
-        `<span class="sk_chip">${escapeHtml(p)}<button data-p="${escapeHtml(p)}" data-kind="${kind}" title="제거">×</button></span>`
-    ).join("");
-    box.querySelectorAll("button").forEach(b =>
-        b.addEventListener("click", () => removeFrom(b.dataset.kind, b.dataset.p)));
+
+    const arr = filter ? applyFilterSort(list, filter.q, filter.sort) : [...list];
+
+    if (!arr.length) {
+        box.innerHTML = (filter && filter.q)
+            ? `<span class="sk_hint">검색 결과 없음</span>`
+            : `<span class="sk_hint">없음</span>`;
+        return;
+    }
+
+    const promoteArrow = scope === "char" ? "▲" : "▼";
+    const promoteTitle = scope === "char" ? "글로벌로 옮기기" : "현재 캐릭터로 옮기기";
+
+    box.innerHTML = arr.map(p => {
+        const esc = escapeHtml(p);
+        return `<span class="sk_chip">
+            <span class="sk_chip_text">${esc}</span>
+            <button class="sk_chip_move" data-p="${esc}" title="${promoteTitle}">${promoteArrow}</button>
+            <button class="sk_chip_remove" data-p="${esc}" title="제거">×</button>
+        </span>`;
+    }).join("");
+
+    box.querySelectorAll(".sk_chip_remove").forEach(b =>
+        b.addEventListener("click", () => {
+            if (scope === "char") removeFrom(kind, b.dataset.p);
+            else removeFromGlobal(kind, b.dataset.p);
+        }));
+    box.querySelectorAll(".sk_chip_move").forEach(b =>
+        b.addEventListener("click", () => {
+            if (scope === "char") promoteToGlobal(b.dataset.p, kind);
+            else demoteToCharacter(b.dataset.p, kind);
+        }));
 }
 
 // ====================================================================

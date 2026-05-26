@@ -9,6 +9,78 @@
 }
 
 /* ====================================================================
+   Master toggle — sits above the tabs, always visible
+==================================================================== */
+.sk_master_toggle {
+    font-weight: 600;
+    padding: 4px 0 6px;
+}
+
+/* ====================================================================
+   Tabs — horizontal segmented row
+==================================================================== */
+.sk_tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin: 10px 0 14px;
+    padding: 3px;
+    background: rgba(0, 0, 0, 0.07);
+    border-radius: 8px;
+}
+
+.sk_tab_btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 6px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.82em;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    opacity: 0.7;
+    transition: background 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.sk_tab_btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    opacity: 1;
+}
+
+.sk_tab_btn.sk_tab_active {
+    background: rgba(255, 255, 255, 0.65);
+    font-weight: 600;
+    opacity: 1;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* ====================================================================
+   Search + sort filter row (shown when list ≥ SEARCH_THRESHOLD items)
+==================================================================== */
+.sk_filter {
+    display: flex;
+    gap: 6px;
+    margin: 8px 0 6px;
+}
+
+.sk_filter .sk_search {
+    flex: 2 1 0;
+    min-width: 0;
+}
+
+.sk_filter .sk_sort {
+    flex: 1 1 0;
+    min-width: 96px;
+    cursor: pointer;
+}
+
+/* ====================================================================
    Vertical rhythm
 ==================================================================== */
 #slop_killer_panel .inline-drawer-content {
@@ -130,28 +202,52 @@
 .sk_chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     padding: 2px 4px 2px 8px;
     font-size: 0.82em;
     background: rgba(255, 255, 255, 0.08);
     border-radius: 12px;
 }
 
-.sk_chip button {
-    border: none;
-    background: rgba(255, 255, 255, 0.12);
-    color: inherit;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    line-height: 14px;
-    cursor: pointer;
-    font-size: 0.9em;
-    padding: 0;
+.sk_chip_text {
+    margin-right: 2px;
 }
 
-.sk_chip button:hover {
+.sk_chip button {
+    border: none;
+    background: transparent;
+    color: inherit;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    opacity: 0.45;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.sk_chip button:hover { opacity: 1; }
+
+.sk_chip_remove {
+    font-size: 0.95em;
+}
+
+.sk_chip_remove:hover {
     background: var(--sk-hl-color, #ff6b6b);
+    color: white;
+}
+
+.sk_chip_move {
+    font-size: 0.7em;
+}
+
+.sk_chip_move:hover {
+    background: var(--SmartThemeQuoteColor, #d4a574);
+    color: white;
 }
 
 /* ====================================================================
@@ -398,13 +494,40 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip {
 }
 
 body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip button {
-    background: var(--sk-accent-soft);
-    color: var(--sk-accent);
+    background: transparent;
+    color: var(--sk-text);
+    opacity: 0.5;
 }
 
-body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip button:hover {
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip_remove:hover {
+    background: var(--sk-hl-color, var(--sk-accent));
+    color: var(--sk-bg);
+    opacity: 1;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip_move:hover {
     background: var(--sk-accent);
     color: var(--sk-bg);
+    opacity: 1;
+}
+
+/* Tabs — themed */
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_tabs {
+    background: var(--sk-bg-elevated);
+    border: 1px solid var(--sk-border);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_tab_btn {
+    color: var(--sk-text);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_tab_btn:hover {
+    background: var(--sk-accent-soft);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_tab_btn.sk_tab_active {
+    background: var(--sk-bg);
+    color: var(--sk-accent);
 }
 
 /* ====================================================================
