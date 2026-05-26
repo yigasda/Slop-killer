@@ -164,12 +164,16 @@
 /* ====================================================================
    Floating window — opened from the wand (magic-wand) menu
 ==================================================================== */
+/* NOTE: a third-party extension puts transform on <html>, which makes <html>
+   the containing block for position:fixed. Its height is content-collapsed,
+   so top/bottom stretching fails (window collapses to ~2px). We size with
+   viewport units (vw/vh) instead — immune to the broken containing block. */
 .sk_backdrop {
     position: fixed;
     top: 0;
-    right: 0;
-    bottom: 0;
     left: 0;
+    width: 100vw;
+    height: 100vh;
     z-index: 9998;
     background: rgba(0, 0, 0, 0.6);
 }
@@ -177,9 +181,12 @@
 .sk_window {
     position: fixed;
     top: 4vh;
-    right: 4vw;
-    bottom: 4vh;
-    left: 4vw;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    width: min(600px, 92vw);
+    height: 92vh;
     z-index: 9999;
     display: flex;
     flex-direction: column;
