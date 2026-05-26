@@ -735,13 +735,13 @@ function buildPanel() {
 
                 <!-- 금지어 (캐릭터별) -->
                 <div class="sk_tab_panel" data-tab="banned">
-                    <h4>현재 캐릭터: <span id="sk_charname" class="sk_charname"></span></h4>
+                    <h4><i class="fa-solid fa-chart-simple sk_h4_icon"></i>현재 캐릭터: <span id="sk_charname" class="sk_charname"></span></h4>
                     <p class="sk_hint">자주 반복된 표현입니다 (많은 순). 🚫 누르면 금지어로 추가 · ✓ 누르면 반복 아님으로 제외</p>
                     <div id="sk_ranking" class="sk_ranking"></div>
                     <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
 
                     <hr>
-                    <h4>등록된 금지어</h4>
+                    <h4><i class="fa-solid fa-ban sk_h4_icon"></i>등록된 금지어</h4>
                     <p class="sk_hint">위 목록에서 🚫를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
                     <div class="sk_ban_row">
                         <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
@@ -754,13 +754,13 @@ function buildPanel() {
                     <div id="sk_banned_list" class="sk_list"></div>
 
                     <hr>
-                    <h4>허용어 (반복 아님)</h4>
+                    <h4><i class="fa-solid fa-circle-check sk_h4_icon"></i>허용어 (반복 아님)</h4>
                     <div id="sk_allowed_list" class="sk_list"></div>
                 </div>
 
                 <!-- 글로벌 -->
                 <div class="sk_tab_panel" data-tab="global" hidden>
-                    <h4>글로벌 금지어</h4>
+                    <h4><i class="fa-solid fa-earth-americas sk_h4_icon"></i>글로벌 금지어</h4>
                     <p class="sk_hint">모든 캐릭터에 적용됩니다. 캐릭터별 금지어와 합쳐서 동작합니다. ▼ 누르면 현재 캐릭터로 옮깁니다.</p>
                     <div class="sk_ban_row">
                         <input id="sk_global_ban_input" type="text" class="text_pole" placeholder="글로벌 금지어 입력">
@@ -773,14 +773,14 @@ function buildPanel() {
                     <div id="sk_global_banned_list" class="sk_list"></div>
 
                     <hr>
-                    <h4>글로벌 허용어</h4>
+                    <h4><i class="fa-solid fa-earth-americas sk_h4_icon"></i>글로벌 허용어</h4>
                     <p class="sk_hint">모든 캐릭터에서 '반복 아님'으로 제외됩니다.</p>
                     <div id="sk_global_allowed_list" class="sk_list"></div>
                 </div>
 
                 <!-- 감지 -->
                 <div class="sk_tab_panel" data-tab="detect" hidden>
-                    <h4>감지 설정</h4>
+                    <h4><i class="fa-solid fa-magnifying-glass sk_h4_icon"></i>감지 설정</h4>
                     <label>표현 길이 — 최소 <span id="sk_minN_val">${s.minN}</span> 단어</label>
                     <input id="sk_minN" type="range" min="1" max="5" value="${s.minN}" class="sk_slider">
                     <label>표현 길이 — 최대 <span id="sk_maxN_val">${s.maxN}</span> 단어</label>
@@ -793,7 +793,7 @@ function buildPanel() {
 
                 <!-- 설정 (테마 / 프롬프트 / 페널티 / 리롤 / 하이라이트 통합) -->
                 <div class="sk_tab_panel" data-tab="settings" hidden>
-                    <h4>테마</h4>
+                    <h4><i class="fa-solid fa-palette sk_h4_icon"></i>테마</h4>
                     <div class="sk_theme_picker">
                         <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
                         <button class="sk_theme_btn" data-theme="cream"  title="Cream (베이지)"></button>
@@ -802,7 +802,7 @@ function buildPanel() {
                     </div>
 
                     <hr>
-                    <h4>프롬프트</h4>
+                    <h4><i class="fa-solid fa-comment-dots sk_h4_icon"></i>프롬프트</h4>
                     <label class="checkbox_label">
                         <input id="sk_injectEnabled" type="checkbox" ${s.injectEnabled ? "checked" : ""}>
                         <span>사용</span>
@@ -815,7 +815,7 @@ function buildPanel() {
                     <button id="sk_injectReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
 
                     <hr>
-                    <h4>반복 페널티 올리기</h4>
+                    <h4><i class="fa-solid fa-gauge-high sk_h4_icon"></i>반복 페널티 올리기</h4>
                     <label class="checkbox_label">
                         <input id="sk_penaltyEnabled" type="checkbox" ${s.penaltyEnabled ? "checked" : ""}>
                         <span>반복이 감지되면 frequency / presence penalty를 자동으로 올려줍니다</span>
@@ -825,7 +825,7 @@ function buildPanel() {
                     <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
 
                     <hr>
-                    <h4>자동 리롤</h4>
+                    <h4><i class="fa-solid fa-arrows-rotate sk_h4_icon"></i>자동 리롤</h4>
                     <label class="checkbox_label">
                         <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
                         <span>등록한 금지어가 답변에 나오면 자동으로 다시 생성합니다</span>
@@ -835,7 +835,7 @@ function buildPanel() {
                     <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
 
                     <hr>
-                    <h4>하이라이트</h4>
+                    <h4><i class="fa-solid fa-highlighter sk_h4_icon"></i>하이라이트</h4>
                     <label class="checkbox_label">
                         <input id="sk_highlightEnabled" type="checkbox" ${s.highlightEnabled ? "checked" : ""}>
                         <span>반복 표현 색칠</span>
@@ -1140,7 +1140,7 @@ function showCtxMenu(x, y, phrase) {
     menu.className = "sk_ctx_menu";
     menu.innerHTML = `
         <span class="sk_ctx_phrase">"${escapeHtml(phrase)}"</span>
-        <button class="sk_ctx_btn">🚫 금지어 추가</button>
+        <button class="sk_ctx_btn">추가</button>
     `;
     document.body.appendChild(menu);
     _ctxMenu = menu;
