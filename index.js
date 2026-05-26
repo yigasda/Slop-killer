@@ -75,7 +75,7 @@ function tokenize(text) {
         .filter(Boolean);
 }
 
-function allStop(words) { return words.every(w => STOPWORDS.has(w)); }
+function contentWordCount(words) { return words.filter(w => !STOPWORDS.has(w)).length; }
 
 function computeCounts() {
     const s = getSettings();
@@ -90,7 +90,7 @@ function computeCounts() {
         for (let n = s.minN; n <= s.maxN; n++) {
             for (let i = 0; i + n <= words.length; i++) {
                 const gram = words.slice(i, i + n);
-                if (allStop(gram)) continue;
+                if (contentWordCount(gram) < 2) continue;
                 const key = gram.join(" ");
                 counts.set(key, (counts.get(key) || 0) + 1);
             }
