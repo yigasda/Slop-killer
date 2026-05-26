@@ -106,3 +106,256 @@
 .sk_chip button:hover {
     background: var(--sk-hl-color, #ff6b6b);
 }
+
+/* ====================================================================
+   Theme picker — round swatch buttons
+==================================================================== */
+.sk_theme_picker {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 4px 0 2px;
+}
+
+.sk_theme_btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    padding: 0;
+    cursor: pointer;
+    transition: border-color 120ms ease, transform 120ms ease;
+    flex-shrink: 0;
+}
+
+.sk_theme_btn:hover { transform: scale(1.15); }
+
+.sk_theme_btn.sk_theme_active {
+    border-color: currentColor;
+    transform: scale(1.15);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.sk_theme_btn[data-theme="system"] { background: #f0c8a8; }
+.sk_theme_btn[data-theme="mono"]   { background: #c8ccd8; }
+.sk_theme_btn[data-theme="cream"]  { background: #f5e5b8; }
+.sk_theme_btn[data-theme="peach"]  { background: #f5c0b0; }
+.sk_theme_btn[data-theme="lilac"]  { background: #dcc4f0; }
+
+/* ====================================================================
+   Theme system — variable-driven styling of #slop_killer_panel,
+   isolated via body[data-sk-theme="..."]. "system" stays native ST.
+==================================================================== */
+
+/* Variable defaults (shared; System falls back to ST theme colors) */
+body[data-sk-theme] #slop_killer_panel {
+    --sk-bg: var(--SmartThemeBlurTintColor, rgba(20, 20, 28, 0.95));
+    --sk-bg-elevated: rgba(255, 255, 255, 0.05);
+    --sk-bg-card: rgba(255, 255, 255, 0.03);
+    --sk-text: var(--SmartThemeBodyColor, #e8e5db);
+    --sk-text-muted: rgba(232, 229, 219, 0.6);
+    --sk-accent: var(--SmartThemeQuoteColor, #d4a574);
+    --sk-accent-soft: rgba(212, 165, 116, 0.18);
+    --sk-border: rgba(232, 229, 219, 0.1);
+    --sk-radius: 8px;
+    --sk-radius-lg: 14px;
+    --sk-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    --sk-fw: 400;
+    --sk-fw-bold: 600;
+}
+
+body[data-sk-theme="mono"] #slop_killer_panel {
+    --sk-bg: #ffffff;
+    --sk-bg-elevated: #f0f0f0;
+    --sk-bg-card: #f8f8f8;
+    --sk-text: #111111;
+    --sk-text-muted: rgba(17, 17, 17, 0.5);
+    --sk-accent: #111111;
+    --sk-accent-soft: rgba(17, 17, 17, 0.08);
+    --sk-border: rgba(17, 17, 17, 0.12);
+    --sk-radius: 4px;
+    --sk-radius-lg: 8px;
+    --sk-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --sk-fw: 400;
+    --sk-fw-bold: 700;
+}
+
+body[data-sk-theme="cream"] #slop_killer_panel {
+    --sk-bg: #f5efe0;
+    --sk-bg-elevated: #ede4d0;
+    --sk-bg-card: #f0e8d6;
+    --sk-text: #3a3328;
+    --sk-text-muted: rgba(58, 51, 40, 0.65);
+    --sk-accent: #b08754;
+    --sk-accent-soft: rgba(176, 135, 84, 0.15);
+    --sk-border: rgba(58, 51, 40, 0.12);
+    --sk-radius: 12px;
+    --sk-radius-lg: 18px;
+    --sk-shadow: 0 4px 12px rgba(58, 51, 40, 0.08);
+    --sk-fw: 400;
+    --sk-fw-bold: 600;
+}
+
+body[data-sk-theme="peach"] #slop_killer_panel {
+    --sk-bg: #fff4ec;
+    --sk-bg-elevated: #ffe5d6;
+    --sk-bg-card: #fff0e3;
+    --sk-text: #5c3826;
+    --sk-text-muted: rgba(92, 56, 38, 0.65);
+    --sk-accent: #ff8a65;
+    --sk-accent-soft: rgba(255, 138, 101, 0.18);
+    --sk-border: rgba(92, 56, 38, 0.12);
+    --sk-radius: 14px;
+    --sk-radius-lg: 20px;
+    --sk-shadow: 0 4px 16px rgba(255, 138, 101, 0.12);
+    --sk-fw: 400;
+    --sk-fw-bold: 600;
+}
+
+body[data-sk-theme="lilac"] #slop_killer_panel {
+    --sk-bg: #fefaff;
+    --sk-bg-elevated: #f5eafe;
+    --sk-bg-card: #fbf5ff;
+    --sk-text: #5c2d7a;
+    --sk-text-muted: rgba(92, 45, 122, 0.55);
+    --sk-accent: #b06dcc;
+    --sk-accent-soft: rgba(176, 109, 204, 0.13);
+    --sk-border: rgba(92, 45, 122, 0.1);
+    --sk-radius: 12px;
+    --sk-radius-lg: 18px;
+    --sk-shadow: 0 4px 20px rgba(60, 30, 90, 0.3);
+    --sk-fw: 400;
+    --sk-fw-bold: 600;
+}
+
+/* Apply variables — every theme except "system" (which stays native). */
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .inline-drawer-content {
+    background: var(--sk-bg);
+    color: var(--sk-text);
+    border-radius: var(--sk-radius-lg);
+    padding: 12px;
+    font-weight: var(--sk-fw);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .inline-drawer-toggle {
+    color: var(--sk-text);
+    font-weight: var(--sk-fw-bold);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel h4 {
+    color: var(--sk-text);
+    font-weight: var(--sk-fw-bold);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel label {
+    color: var(--sk-text);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_hint {
+    color: var(--sk-text-muted);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel hr {
+    border-top: 1px solid var(--sk-border) !important;
+    margin: 14px 0 !important;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .text_pole {
+    background: var(--sk-bg-elevated) !important;
+    color: var(--sk-text) !important;
+    border: 1px solid var(--sk-border) !important;
+    border-radius: var(--sk-radius) !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .menu_button {
+    background: var(--sk-bg-elevated) !important;
+    color: var(--sk-text) !important;
+    border: 1px solid var(--sk-border) !important;
+    border-radius: var(--sk-radius) !important;
+    font-weight: var(--sk-fw-bold) !important;
+    transition: all 150ms ease !important;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .menu_button:hover {
+    background: var(--sk-accent-soft) !important;
+    border-color: var(--sk-accent) !important;
+    color: var(--sk-accent) !important;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel input[type="range"] {
+    accent-color: var(--sk-accent) !important;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--sk-border) !important;
+    outline: none !important;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel input[type="range"]::-webkit-slider-runnable-track {
+    background: var(--sk-border) !important;
+    height: 4px;
+    border-radius: 2px;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--sk-accent) !important;
+    border: none !important;
+    margin-top: -6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel input[type="range"]::-moz-range-track {
+    background: var(--sk-border) !important;
+    height: 4px;
+    border-radius: 2px;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--sk-accent) !important;
+    border: none !important;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel input[type="checkbox"] {
+    accent-color: var(--sk-accent) !important;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_ranking {
+    background: var(--sk-bg-card);
+    border: 1px solid var(--sk-border);
+    border-radius: var(--sk-radius);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_rank_phrase {
+    color: var(--sk-text);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_rank_count {
+    color: var(--sk-text-muted);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip {
+    background: var(--sk-bg-elevated);
+    color: var(--sk-text);
+    border: 1px solid var(--sk-border);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip button {
+    background: var(--sk-accent-soft);
+    color: var(--sk-accent);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip button:hover {
+    background: var(--sk-accent);
+    color: var(--sk-bg);
+}

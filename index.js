@@ -8,6 +8,7 @@ const MODULE_NAME = "slop_killer";
 
 const DEFAULT_SETTINGS = Object.freeze({
     enabled: true,
+    theme: "cream",     // system | mono | cream | peach | lilac
     minN: 2,            // shortest phrase length (words)
     maxN: 4,            // longest phrase length (words)
     threshold: 3,       // occurrences needed to count as slop
@@ -315,6 +316,18 @@ function applyColor() {
 }
 
 // ====================================================================
+// Theme — sets data-sk-theme on <body>; all panel styling is variable-driven
+// in style.css. "system" leaves the panel in native ST appearance.
+// ====================================================================
+function applyTheme() {
+    const theme = getSettings().theme || "cream";
+    document.body.setAttribute("data-sk-theme", theme);
+    document.querySelectorAll("#slop_killer_panel .sk_theme_btn").forEach(btn => {
+        btn.classList.toggle("sk_theme_active", btn.dataset.theme === theme);
+    });
+}
+
+// ====================================================================
 // Manual ban / allow actions
 // ====================================================================
 function normalizePhrase(p) { return String(p).toLowerCase().trim(); }
@@ -378,6 +391,16 @@ function buildPanel() {
                     <input id="sk_enabled" type="checkbox" ${s.enabled ? "checked" : ""}>
                     <span>확장 활성화</span>
                 </label>
+
+                <hr>
+                <h4>🎨 테마</h4>
+                <div class="sk_theme_picker">
+                    <button class="sk_theme_btn" data-theme="system" title="System (기본)"></button>
+                    <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
+                    <button class="sk_theme_btn" data-theme="cream"  title="Cream (베이지)"></button>
+                    <button class="sk_theme_btn" data-theme="peach"  title="Peach (피치)"></button>
+                    <button class="sk_theme_btn" data-theme="lilac"  title="Lilac (연보라)"></button>
+                </div>
 
                 <hr>
                 <h4>🔍 감지 설정</h4>
@@ -483,6 +506,14 @@ function bindPanel() {
     const doAdd = () => { if (banInput.value.trim()) { addBanned(banInput.value); banInput.value = ""; } };
     document.getElementById("sk_ban_add").addEventListener("click", doAdd);
     banInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+
+    document.querySelectorAll("#slop_killer_panel .sk_theme_btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            s.theme = btn.dataset.theme;
+            applyTheme();
+            save();
+        });
+    });
 }
 
 function renderPanel() {
@@ -547,6 +578,7 @@ jQuery(() => {
         getSettings();
         applyColor();
         buildPanel();
+        applyTheme();
 
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (mesId) => {
             highlightMessage(mesId);
