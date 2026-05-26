@@ -288,6 +288,10 @@ body[data-sk-theme] #slop_killer_panel hr {
     flex-shrink: 0;
 }
 
+/* Ban / allow action icons (Font Awesome, colored) */
+.sk_ic_ban   { color: #e23b3b; }
+.sk_ic_allow { color: #2fa86e; }
+
 /* ====================================================================
    Scrollable list view — banned / allowed (per-character & global)
 ==================================================================== */
@@ -400,14 +404,14 @@ body[data-sk-theme] #slop_killer_panel hr {
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
-.sk_theme_btn[data-theme="mono"] { background: #c8ccd8; }
-.sk_theme_btn[data-theme="rose"] { background: #f7b8cc; }
-.sk_theme_btn[data-theme="mint"] { background: #a8e6c9; }
-.sk_theme_btn[data-theme="sky"]  { background: #aecbf7; }
+.sk_theme_btn[data-theme="mono"]  { background: #c8ccd8; }
+.sk_theme_btn[data-theme="rose"]  { background: #f7b8cc; }
+.sk_theme_btn[data-theme="ivory"] { background: #efe6c8; }
+.sk_theme_btn[data-theme="sky"]   { background: #aecbf7; }
 
 /* ====================================================================
    Theme system — variable-driven styling of #slop_killer_panel,
-   isolated via body[data-sk-theme="..."]. mono + rose / mint / sky.
+   isolated via body[data-sk-theme="..."]. mono + rose / ivory / sky.
 ==================================================================== */
 
 /* Variable defaults (shared fallback) */
@@ -461,18 +465,18 @@ body[data-sk-theme="rose"] #slop_killer_panel {
     --sk-fw-bold: 700;
 }
 
-body[data-sk-theme="mint"] #slop_killer_panel {
-    --sk-bg: #f3fcf7;
-    --sk-bg-elevated: #e2f6ec;
-    --sk-bg-card: #edfbf3;
-    --sk-text: #1f5540;
-    --sk-text-muted: rgba(31, 85, 64, 0.5);
-    --sk-accent: #3fb785;
-    --sk-accent-soft: rgba(63, 183, 133, 0.12);
-    --sk-border: rgba(31, 85, 64, 0.12);
+body[data-sk-theme="ivory"] #slop_killer_panel {
+    --sk-bg: #fdfcf5;
+    --sk-bg-elevated: #f5f1e3;
+    --sk-bg-card: #faf7ec;
+    --sk-text: #4a4534;
+    --sk-text-muted: rgba(74, 69, 52, 0.5);
+    --sk-accent: #c2ad7e;
+    --sk-accent-soft: rgba(194, 173, 126, 0.14);
+    --sk-border: rgba(74, 69, 52, 0.12);
     --sk-radius: 4px;
     --sk-radius-lg: 8px;
-    --sk-shadow: 0 2px 8px rgba(40, 120, 90, 0.18);
+    --sk-shadow: 0 2px 8px rgba(140, 125, 80, 0.16);
     --sk-fw: 400;
     --sk-fw-bold: 700;
 }

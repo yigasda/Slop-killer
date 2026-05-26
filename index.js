@@ -14,11 +14,11 @@ const PASTEL_CHIPS = [
 
 const TABS = ["banned", "global", "detect", "settings"];
 const SEARCH_THRESHOLD = 10;   // show search/sort UI when list has ≥ this many items
-const VALID_THEMES = new Set(["mono", "rose", "mint", "sky"]);
+const VALID_THEMES = new Set(["mono", "rose", "ivory", "sky"]);
 
 const DEFAULT_SETTINGS = Object.freeze({
     enabled: true,
-    theme: "rose",      // mono | rose | mint | sky
+    theme: "mono",      // mono | rose | ivory | sky
     minN: 2,            // shortest phrase length (words)
     maxN: 4,            // longest phrase length (words)
     threshold: 3,       // occurrences needed to count as slop
@@ -216,7 +216,7 @@ function overlaps(a, b) {
 }
 
 // Raw n-grams above threshold, excluding allowed phrases (and anything that
-// overlaps an allowed phrase, so ✓ clears the whole run). Sorted by count.
+// overlaps an allowed phrase, so the allow action clears the whole run). Sorted by count.
 function aboveThreshold() {
     const s = getSettings();
     const allowed = mergedAllowed();
@@ -555,7 +555,7 @@ function applyColor() {
 
 // ====================================================================
 // Theme — sets data-sk-theme on <body>; all panel styling is variable-driven
-// in style.css. Themes: mono (flat B/W) + rose / mint / sky pastels.
+// in style.css. Themes: mono (flat B/W) + rose / ivory / sky pastels.
 // ====================================================================
 function applyTheme() {
     const theme = getSettings().theme || DEFAULT_SETTINGS.theme;
@@ -737,13 +737,13 @@ function buildPanel() {
                 <!-- 금지어 (캐릭터별) -->
                 <div class="sk_tab_panel" data-tab="banned">
                     <h4><i class="fa-solid fa-chart-simple sk_h4_icon"></i>현재 캐릭터: <span id="sk_charname" class="sk_charname"></span></h4>
-                    <p class="sk_hint">자주 반복된 표현입니다 (많은 순). 🚫 누르면 금지어로 추가 · ✓ 누르면 반복 아님으로 제외</p>
+                    <p class="sk_hint">자주 반복된 표현입니다 (많은 순). <i class="fa-solid fa-ban sk_ic_ban"></i> 누르면 금지어로 추가 · <i class="fa-solid fa-check sk_ic_allow"></i> 누르면 반복 아님으로 제외</p>
                     <div id="sk_ranking" class="sk_ranking"></div>
                     <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
 
                     <hr>
                     <h4><i class="fa-solid fa-ban sk_h4_icon"></i>등록된 금지어</h4>
-                    <p class="sk_hint">위 목록에서 🚫를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
+                    <p class="sk_hint">위 목록에서 <i class="fa-solid fa-ban sk_ic_ban"></i>를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
                     <div class="sk_ban_row">
                         <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
                         <button id="sk_ban_add" class="menu_button">추가</button>
@@ -796,10 +796,10 @@ function buildPanel() {
                 <div class="sk_tab_panel" data-tab="settings" hidden>
                     <h4><i class="fa-solid fa-palette sk_h4_icon"></i>테마</h4>
                     <div class="sk_theme_picker">
-                        <button class="sk_theme_btn" data-theme="mono" title="Mono (흑백)"></button>
-                        <button class="sk_theme_btn" data-theme="rose" title="Rose (로즈)"></button>
-                        <button class="sk_theme_btn" data-theme="mint" title="Mint (민트)"></button>
-                        <button class="sk_theme_btn" data-theme="sky"  title="Sky (스카이)"></button>
+                        <button class="sk_theme_btn" data-theme="mono"  title="Mono (흑백)"></button>
+                        <button class="sk_theme_btn" data-theme="rose"  title="Rose (로즈)"></button>
+                        <button class="sk_theme_btn" data-theme="ivory" title="Ivory (아이보리)"></button>
+                        <button class="sk_theme_btn" data-theme="sky"   title="Sky (스카이)"></button>
                     </div>
 
                     <hr>
@@ -1033,8 +1033,8 @@ function renderRanking() {
         <div class="sk_rank_row">
             <span class="sk_rank_count">×${count}</span>
             <span class="sk_rank_phrase">${escapeHtml(phrase)}</span>
-            <button class="menu_button sk_ban_btn" data-p="${escapeHtml(phrase)}" title="금지어로 추가">🚫</button>
-            <button class="menu_button sk_allow_btn" data-p="${escapeHtml(phrase)}" title="반복 아님으로 제외">✓</button>
+            <button class="menu_button sk_ban_btn" data-p="${escapeHtml(phrase)}" title="금지어로 추가"><i class="fa-solid fa-ban sk_ic_ban"></i></button>
+            <button class="menu_button sk_allow_btn" data-p="${escapeHtml(phrase)}" title="반복 아님으로 제외"><i class="fa-solid fa-check sk_ic_allow"></i></button>
         </div>`).join("");
 
     box.querySelectorAll(".sk_ban_btn").forEach(b =>
