@@ -188,6 +188,22 @@ function tokenize(text) {
         .filter(Boolean);
 }
 
+// Split text into sentence segments (by .!?…\n) and tokenize each independently.
+// Used in computeCounts so n-grams never span a sentence boundary — critical for
+// languages with short sentences (Korean) where cross-boundary n-grams kill recall.
+function tokenizeSentences(text) {
+    return text
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/[*_`~>#\[\]()]/g, " ")
+        .split(/[.!?…\n]+/)
+        .map(seg =>
+            seg.split(/\s+/)
+               .map(w => w.replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, "").toLowerCase())
+               .filter(Boolean)
+        )
+        .filter(seg => seg.length > 0);
+}
+
 function isHangulToken(w) { return /^[가-힣]+$/.test(w); }
 
 // Strip one trailing particle/ending to normalize Korean inflected variants.
@@ -215,9 +231,11 @@ function effectiveStopwords() {
     return set;
 }
 
-// Count n-grams across recent AI messages. When Korean mode is on, n-grams are
-// keyed by their suffix-stripped (normalized) form so inflected variants merge,
+// Count n-grams across recent AI messages. N-grams are keyed by their
+// suffix-stripped (normalized) form so Korean inflected variants merge,
 // while the most frequent surface form is kept as the display representative.
+// Tokenization is sentence-aware: n-grams never cross sentence boundaries,
+// which prevents short-sentence languages (Korean) from producing only 2-grams.
 function computeCounts() {
     const s = getSettings();
     const stop = effectiveStopwords();
@@ -228,18 +246,19 @@ function computeCounts() {
 
     const agg = new Map();   // normKey -> { count, surfaces: Map<surface, count> }
     for (const m of msgs) {
-        const surf = tokenize(m.mes);
-        const norm = surf.map(stripKoSuffix);
-        for (let n = s.minN; n <= s.maxN; n++) {
-            for (let i = 0; i + n <= surf.length; i++) {
-                const normGram = norm.slice(i, i + n);
-                if (normGram.filter(w => !stop.has(w)).length < 2) continue;
-                const key = normGram.join(" ");
-                let e = agg.get(key);
-                if (!e) { e = { count: 0, surfaces: new Map() }; agg.set(key, e); }
-                e.count++;
-                const sf = surf.slice(i, i + n).join(" ");
-                e.surfaces.set(sf, (e.surfaces.get(sf) || 0) + 1);
+        for (const surf of tokenizeSentences(m.mes)) {
+            const norm = surf.map(stripKoSuffix);
+            for (let n = s.minN; n <= s.maxN; n++) {
+                for (let i = 0; i + n <= surf.length; i++) {
+                    const normGram = norm.slice(i, i + n);
+                    if (normGram.filter(w => !stop.has(w)).length < 2) continue;
+                    const key = normGram.join(" ");
+                    let e = agg.get(key);
+                    if (!e) { e = { count: 0, surfaces: new Map() }; agg.set(key, e); }
+                    e.count++;
+                    const sf = surf.slice(i, i + n).join(" ");
+                    e.surfaces.set(sf, (e.surfaces.get(sf) || 0) + 1);
+                }
             }
         }
     }
