@@ -221,7 +221,6 @@ function boostPenalty(s) {
     _penaltyRestore = { oai, freq: oai.freq_pen_openai, pres: oai.pres_pen_openai };
     oai.freq_pen_openai = Math.min(2, (oai.freq_pen_openai || 0) + s.penaltyBoost);
     oai.pres_pen_openai = Math.min(2, (oai.pres_pen_openai || 0) + s.penaltyBoost);
-    console.log(`[SlopKiller] penalty boost: freq ${_penaltyRestore.freq} → ${oai.freq_pen_openai}, pres ${_penaltyRestore.pres} → ${oai.pres_pen_openai}, source: ${source}`);
 }
 
 function restorePenalty() {
