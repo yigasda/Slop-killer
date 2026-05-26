@@ -22,9 +22,10 @@ const DEFAULT_SETTINGS = Object.freeze({
     injectEnabled: true,
     maxInject: 12,      // max phrases sent to the model
     injectTemplate:
-        "[System note — writing variety] Avoid reusing the following overused phrases, " +
-        "or any close paraphrase, in your next reply: {{phrases}}. Vary your sentence " +
-        "structure and reach for fresh wording and new sensory detail instead.",
+        "[System note — writing variety]\n" +
+        "STRICTLY FORBIDDEN — never write these phrases or any close variation, under any circumstance: {{banned}}.\n" +
+        "Also avoid overusing these repeated phrases, or close paraphrases: {{slop}}.\n" +
+        "Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
     highlightEnabled: true,
     highlightColor: "#ff6b6b",
     penaltyEnabled: true,
@@ -41,6 +42,11 @@ const PENALTY_BACKENDS = new Set([
 
 // Saved penalty values while a generation is in-flight; restored on GENERATION_ENDED.
 let _penaltyRestore = null;
+
+// Old default templates — auto-upgraded to the current default on load.
+const LEGACY_INJECT_TEMPLATES = new Set([
+    "[System note — writing variety] Avoid reusing the following overused phrases, or any close paraphrase, in your next reply: {{phrases}}. Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
+]);
 
 // English stopwords — phrases made of ONLY these are ignored.
 const STOPWORDS = new Set((
@@ -66,6 +72,7 @@ function getSettings() {
     for (const k of Object.keys(DEFAULT_SETTINGS)) {
         if (!Object.hasOwn(s, k)) s[k] = structuredClone(DEFAULT_SETTINGS[k]);
     }
+    if (LEGACY_INJECT_TEMPLATES.has(s.injectTemplate)) s.injectTemplate = DEFAULT_SETTINGS.injectTemplate;
     return s;
 }
 
@@ -187,17 +194,48 @@ function rankSlop() {
     return kept;
 }
 
-// Injection list = manual banned ∪ deduped auto (capped to a token budget).
-function injectionPhrases(cap) {
+// Injection lists, split by source: manual banned (strict) vs auto-detected
+// slop (soft). Deduped against each other; banned takes priority in the cap.
+function injectionLists(cap) {
     const cd = getCharData(getCurrentCharName());
-    const out = [];
-    const push = (p) => {
-        const k = String(p).toLowerCase().trim();
-        if (k && !out.includes(k)) out.push(k);
+    const seen = new Set();
+    const collect = (src, into) => {
+        for (const p of src) {
+            const k = String(p).toLowerCase().trim();
+            if (k && !seen.has(k)) { seen.add(k); into.push(k); }
+        }
     };
-    cd.banned.forEach(push);
-    rankSlop().forEach(x => push(x.phrase));
-    return cap ? out.slice(0, cap) : out;
+    const banned = [];
+    collect(cd.banned, banned);
+    const slop = [];
+    collect(rankSlop().map(x => x.phrase), slop);
+    if (!cap) return { banned, slop };
+    const bannedCapped = banned.slice(0, cap);
+    const slopCapped = slop.slice(0, Math.max(0, cap - bannedCapped.length));
+    return { banned: bannedCapped, slop: slopCapped };
+}
+
+// Renders an injection template. {{banned}} / {{slop}} / {{phrases}} are
+// substituted with quoted lists; a line is dropped entirely if its placeholder
+// list is empty. Templates with no placeholder get the merged list appended.
+function buildInjectionText(template, banned, slop) {
+    const fmt = arr => arr.map(p => `"${p}"`).join(", ");
+    const all = [...banned, ...slop];
+    const out = [];
+    for (const line of template.split("\n")) {
+        if (line.includes("{{banned}}") && banned.length === 0) continue;
+        if (line.includes("{{slop}}") && slop.length === 0) continue;
+        if (line.includes("{{phrases}}") && all.length === 0) continue;
+        out.push(line
+            .replaceAll("{{banned}}", fmt(banned))
+            .replaceAll("{{slop}}", fmt(slop))
+            .replaceAll("{{phrases}}", fmt(all)));
+    }
+    let text = out.join("\n").trim();
+    if (!/\{\{(banned|slop|phrases)\}\}/.test(template) && all.length) {
+        text = `${text} ${fmt(all)}`.trim();
+    }
+    return text;
 }
 
 // Highlight set = manual banned ∪ all above-threshold n-grams (broad coverage
@@ -244,22 +282,21 @@ globalThis.slopKillerInterceptor = async function (chat, _contextSize, _abort, t
         if (!s.enabled || (!s.injectEnabled && !s.penaltyEnabled)) return;
         if (!Array.isArray(chat) || chat.length === 0) return;
 
-        const phrases = injectionPhrases(s.maxInject);
-        if (phrases.length === 0) return;
+        const { banned, slop } = injectionLists(s.maxInject);
+        if (banned.length === 0 && slop.length === 0) return;
 
         if (s.injectEnabled) {
-            const list = phrases.map(p => `"${p}"`).join(", ");
             const template = s.injectTemplate || DEFAULT_SETTINGS.injectTemplate;
-            const mes = template.includes("{{phrases}}")
-                ? template.replaceAll("{{phrases}}", list)
-                : `${template} ${list}`;
-            const note = {
-                is_user: false,
-                name: "System",
-                send_date: Date.now(),
-                mes,
-            };
-            chat.splice(chat.length - 1, 0, note);
+            const mes = buildInjectionText(template, banned, slop);
+            if (mes) {
+                const note = {
+                    is_user: false,
+                    name: "System",
+                    send_date: Date.now(),
+                    mes,
+                };
+                chat.splice(chat.length - 1, 0, note);
+            }
         }
 
         if (s.penaltyEnabled) boostPenalty(s);
@@ -472,7 +509,7 @@ function buildPanel() {
                 <label>주입 최대 개수 — <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
                 <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
                 <label>주입 문구 (템플릿)</label>
-                <p class="sk_hint"><code>{{phrases}}</code> 위치에 감지된 표현 목록이 자동으로 들어갑니다.</p>
+                <p class="sk_hint"><code>{{banned}}</code> 수동 금지어, <code>{{slop}}</code> 자동 감지어, <code>{{phrases}}</code> 둘 다. 목록이 비면 그 줄은 자동 생략됩니다.</p>
                 <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
                 <button id="sk_injectReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
 
