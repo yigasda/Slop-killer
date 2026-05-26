@@ -9,49 +9,48 @@
 }
 
 /* ====================================================================
-   Vertical rhythm — generous breathing room between sections & controls
+   Vertical rhythm
 ==================================================================== */
 #slop_killer_panel .inline-drawer-content {
-    padding-top: 8px;
+    padding-top: 6px;
 }
 
 #slop_killer_panel h4 {
-    margin: 0 0 14px;
-    font-size: 1em;
+    margin: 14px 0 6px;
+    font-size: 0.95em;
     font-weight: 600;
     line-height: 1.3;
-    letter-spacing: 0.01em;
 }
 
 #slop_killer_panel hr {
     border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    margin: 26px 0 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    margin: 6px 0 2px;
 }
 
 #slop_killer_panel label:not(.checkbox_label) {
     display: block;
-    margin: 18px 0 8px;
+    margin: 10px 0 4px;
     font-size: 0.88em;
     line-height: 1.4;
     opacity: 0.88;
 }
 
 #slop_killer_panel label.checkbox_label {
-    margin: 10px 0;
+    margin: 7px 0;
     line-height: 1.45;
 }
 
 #slop_killer_panel .sk_hint {
     font-size: 0.82em;
-    opacity: 0.62;
-    line-height: 1.55;
-    margin: 8px 0 14px;
+    opacity: 0.65;
+    line-height: 1.5;
+    margin: 2px 0 8px;
 }
 
 #slop_killer_panel .sk_slider {
     width: 100%;
-    margin: 4px 0 10px;
+    margin: 2px 0 6px;
     display: block;
 }
 
@@ -124,8 +123,8 @@
 .sk_chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 6px;
+    gap: 5px;
+    margin: 8px 0 6px;
 }
 
 .sk_chip {
@@ -281,7 +280,7 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .inline-dra
     background: var(--sk-bg);
     color: var(--sk-text);
     border-radius: var(--sk-radius-lg);
-    padding: 18px 16px;
+    padding: 14px;
     font-weight: var(--sk-fw);
 }
 
@@ -305,7 +304,7 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_hint {
 
 body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel hr {
     border-top: 1px solid var(--sk-border) !important;
-    margin: 26px 0 18px !important;
+    margin: 6px 0 2px !important;
 }
 
 body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .text_pole {
@@ -415,8 +414,8 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip bu
     display: block;
     width: 100%;
     white-space: nowrap;
-    margin-top: 6px;
-    margin-bottom: 0;
+    margin-top: 8px;
+    margin-bottom: 6px;
 }
 
 /* ====================================================================
@@ -436,7 +435,8 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip bu
     display: block;
     width: 100%;
     white-space: nowrap;
-    margin-bottom: 0;
+    margin-top: 6px;
+    margin-bottom: 6px;
 }
 
 /* ====================================================================
@@ -446,7 +446,7 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip bu
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: 6px 0 4px;
+    margin: 8px 0 6px;
 }
 
 .sk_color_preview {
@@ -470,8 +470,7 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip bu
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 6px;
-    margin-bottom: 4px;
+    margin: 8px 0 6px;
 }
 
 .sk_color_chip {
