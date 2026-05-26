@@ -578,9 +578,9 @@ function buildPanel() {
 
                 <hr>
                 <h4>감지 설정</h4>
-                <label>표현 길이 — 짧게는 <span id="sk_minN_val">${s.minN}</span> 단어</label>
+                <label>표현 길이 — 최소 <span id="sk_minN_val">${s.minN}</span> 단어</label>
                 <input id="sk_minN" type="range" min="1" max="5" value="${s.minN}" class="sk_slider">
-                <label>표현 길이 — 길게는 <span id="sk_maxN_val">${s.maxN}</span> 단어</label>
+                <label>표현 길이 — 최대 <span id="sk_maxN_val">${s.maxN}</span> 단어</label>
                 <input id="sk_maxN" type="range" min="1" max="6" value="${s.maxN}" class="sk_slider">
                 <label>반복으로 볼 기준 — <span id="sk_threshold_val">${s.threshold}</span>회 이상</label>
                 <input id="sk_threshold" type="range" min="2" max="15" value="${s.threshold}" class="sk_slider">
@@ -606,7 +606,7 @@ function buildPanel() {
                     <input id="sk_penaltyEnabled" type="checkbox" ${s.penaltyEnabled ? "checked" : ""}>
                     <span>반복이 감지되면 frequency / presence penalty를 자동으로 올려줍니다</span>
                 </label>
-                <p class="sk_hint">오픈AI 호환 백엔드(예: DeepSeek, Groq, Mistral, OpenRouter, xAI 등)에서만 작동합니다. Gemini·Claude는 무시됩니다.</p>
+                <p class="sk_hint">오픈AI 호환 백엔드(예: OpenRouter, DeepSeek, Moonshot 등)에서만 작동합니다. Gemini·Claude는 무시됩니다.</p>
                 <label>부스트 강도 — <span id="sk_penaltyBoost_val">${s.penaltyBoost}</span></label>
                 <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
 
@@ -637,7 +637,7 @@ function buildPanel() {
                 </div>
 
                 <hr>
-                <h4>현재 캐릭터: <span id="sk_charname" style="color:var(--SmartThemeQuoteColor);"></span></h4>
+                <h4>현재 캐릭터: <span id="sk_charname" class="sk_charname"></span></h4>
                 <p class="sk_hint">자주 반복된 표현입니다 (많은 순). 🚫 누르면 금지어로 추가 · ✓ 누르면 반복 아님으로 제외</p>
                 <div id="sk_ranking" class="sk_ranking"></div>
                 <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
@@ -645,13 +645,13 @@ function buildPanel() {
                 <hr>
                 <h4>등록된 금지어</h4>
                 <p class="sk_hint">위 목록에서 🚫를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
-                <div style="display:flex; gap:6px;">
-                    <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력" style="flex:1;">
+                <div class="sk_ban_row">
+                    <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
                     <button id="sk_ban_add" class="menu_button">추가</button>
                 </div>
                 <div id="sk_banned_list" class="sk_chips"></div>
 
-                <h4 style="margin-top:10px;">허용어 (반복 아님)</h4>
+                <h4>허용어 (반복 아님)</h4>
                 <div id="sk_allowed_list" class="sk_chips"></div>
 
             </div>
