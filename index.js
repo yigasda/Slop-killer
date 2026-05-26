@@ -750,11 +750,11 @@ function buildPanel() {
                         <input id="sk_char_banned_search" type="text" class="text_pole sk_search" placeholder="검색">
                         <select id="sk_char_banned_sort" class="text_pole sk_sort">${SORT_OPTIONS}</select>
                     </div>
-                    <div id="sk_banned_list" class="sk_chips"></div>
+                    <div id="sk_banned_list" class="sk_list"></div>
 
                     <hr>
                     <h4>허용어 (반복 아님)</h4>
-                    <div id="sk_allowed_list" class="sk_chips"></div>
+                    <div id="sk_allowed_list" class="sk_list"></div>
                 </div>
 
                 <!-- 글로벌 -->
@@ -769,12 +769,12 @@ function buildPanel() {
                         <input id="sk_global_banned_search" type="text" class="text_pole sk_search" placeholder="검색">
                         <select id="sk_global_banned_sort" class="text_pole sk_sort">${SORT_OPTIONS}</select>
                     </div>
-                    <div id="sk_global_banned_list" class="sk_chips"></div>
+                    <div id="sk_global_banned_list" class="sk_list"></div>
 
                     <hr>
                     <h4>글로벌 허용어</h4>
                     <p class="sk_hint">모든 캐릭터에서 '반복 아님'으로 제외됩니다.</p>
-                    <div id="sk_global_allowed_list" class="sk_chips"></div>
+                    <div id="sk_global_allowed_list" class="sk_list"></div>
                 </div>
 
                 <!-- 감지 -->
@@ -790,9 +790,19 @@ function buildPanel() {
                     <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
                 </div>
 
-                <!-- 설정 (주입 / 리롤 / 하이라이트 / 테마 통합) -->
+                <!-- 설정 (테마 / 프롬프트 / 페널티 / 리롤 / 하이라이트 통합) -->
                 <div class="sk_tab_panel" data-tab="settings" hidden>
-                    <h4>프롬프트 주입</h4>
+                    <h4>테마</h4>
+                    <div class="sk_theme_picker">
+                        <button class="sk_theme_btn" data-theme="system" title="System (기본)"></button>
+                        <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
+                        <button class="sk_theme_btn" data-theme="cream"  title="Cream (베이지)"></button>
+                        <button class="sk_theme_btn" data-theme="peach"  title="Peach (피치)"></button>
+                        <button class="sk_theme_btn" data-theme="lilac"  title="Lilac (연보라)"></button>
+                    </div>
+
+                    <hr>
+                    <h4>프롬프트</h4>
                     <label class="checkbox_label">
                         <input id="sk_injectEnabled" type="checkbox" ${s.injectEnabled ? "checked" : ""}>
                         <span>사용</span>
@@ -838,16 +848,6 @@ function buildPanel() {
                     </div>
                     <div class="sk_color_chips">
                         ${PASTEL_CHIPS.map(c => `<button class="sk_color_chip" data-color="${c}" style="background:${c}" title="${c}"></button>`).join("")}
-                    </div>
-
-                    <hr>
-                    <h4>테마</h4>
-                    <div class="sk_theme_picker">
-                        <button class="sk_theme_btn" data-theme="system" title="System (기본)"></button>
-                        <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
-                        <button class="sk_theme_btn" data-theme="cream"  title="Cream (베이지)"></button>
-                        <button class="sk_theme_btn" data-theme="peach"  title="Peach (피치)"></button>
-                        <button class="sk_theme_btn" data-theme="lilac"  title="Lilac (연보라)"></button>
                     </div>
                 </div>
 
@@ -1070,29 +1070,29 @@ function renderChipBox(id, list, kind, scope, filter) {
 
     if (!arr.length) {
         box.innerHTML = (filter && filter.q)
-            ? `<span class="sk_hint">검색 결과 없음</span>`
-            : `<span class="sk_hint">없음</span>`;
+            ? `<div class="sk_list_empty">검색 결과 없음</div>`
+            : `<div class="sk_list_empty">없음</div>`;
         return;
     }
 
-    const promoteArrow = scope === "char" ? "▲" : "▼";
-    const promoteTitle = scope === "char" ? "글로벌로 옮기기" : "현재 캐릭터로 옮기기";
+    const moveArrow = scope === "char" ? "▲" : "▼";
+    const moveTitle = scope === "char" ? "글로벌로 옮기기" : "현재 캐릭터로 옮기기";
 
     box.innerHTML = arr.map(p => {
         const esc = escapeHtml(p);
-        return `<span class="sk_chip">
-            <span class="sk_chip_text">${esc}</span>
-            <button class="sk_chip_move" data-p="${esc}" title="${promoteTitle}">${promoteArrow}</button>
-            <button class="sk_chip_remove" data-p="${esc}" title="제거">×</button>
-        </span>`;
+        return `<div class="sk_list_row">
+            <span class="sk_list_text" title="${esc}">${esc}</span>
+            <button class="sk_list_move" data-p="${esc}" title="${moveTitle}">${moveArrow}</button>
+            <button class="sk_list_remove" data-p="${esc}" title="제거">×</button>
+        </div>`;
     }).join("");
 
-    box.querySelectorAll(".sk_chip_remove").forEach(b =>
+    box.querySelectorAll(".sk_list_remove").forEach(b =>
         b.addEventListener("click", () => {
             if (scope === "char") removeFrom(kind, b.dataset.p);
             else removeFromGlobal(kind, b.dataset.p);
         }));
-    box.querySelectorAll(".sk_chip_move").forEach(b =>
+    box.querySelectorAll(".sk_list_move").forEach(b =>
         b.addEventListener("click", () => {
             if (scope === "char") promoteToGlobal(b.dataset.p, kind);
             else demoteToCharacter(b.dataset.p, kind);

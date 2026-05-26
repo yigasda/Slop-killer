@@ -192,62 +192,87 @@
     flex-shrink: 0;
 }
 
-.sk_chips {
+/* ====================================================================
+   Scrollable list view — banned / allowed (per-character & global)
+==================================================================== */
+.sk_list {
+    max-height: 280px;
+    overflow-y: auto;
     display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 6px;
     margin: 8px 0 6px;
 }
 
-.sk_chip {
-    display: inline-flex;
+.sk_list_row {
+    display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 2px 4px 2px 8px;
-    font-size: 0.82em;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
 }
 
-.sk_chip_text {
-    margin-right: 2px;
+.sk_list_row:hover {
+    background: rgba(255, 255, 255, 0.06);
 }
 
-.sk_chip button {
+.sk_list_text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sk_list_row button {
     border: none;
     background: transparent;
     color: inherit;
     border-radius: 50%;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     line-height: 1;
     cursor: pointer;
     padding: 0;
-    opacity: 0.45;
+    opacity: 0.4;
+    flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
 }
 
-.sk_chip button:hover { opacity: 1; }
+.sk_list_row:hover button { opacity: 0.7; }
 
-.sk_chip_remove {
-    font-size: 0.95em;
+.sk_list_row button:hover { opacity: 1; }
+
+.sk_list_remove {
+    font-size: 1em;
 }
 
-.sk_chip_remove:hover {
+.sk_list_remove:hover {
     background: var(--sk-hl-color, #ff6b6b);
     color: white;
 }
 
-.sk_chip_move {
-    font-size: 0.7em;
+.sk_list_move {
+    font-size: 0.75em;
 }
 
-.sk_chip_move:hover {
+.sk_list_move:hover {
     background: var(--SmartThemeQuoteColor, #d4a574);
     color: white;
+}
+
+.sk_list_empty {
+    padding: 14px 8px;
+    text-align: center;
+    font-size: 0.82em;
+    opacity: 0.55;
 }
 
 /* ====================================================================
@@ -487,28 +512,33 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_rank_co
     color: var(--sk-text-muted);
 }
 
-body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip {
-    background: var(--sk-bg-elevated);
-    color: var(--sk-text);
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_list {
+    background: var(--sk-bg-card);
     border: 1px solid var(--sk-border);
 }
 
-body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip button {
-    background: transparent;
-    color: var(--sk-text);
-    opacity: 0.5;
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_list_row:hover {
+    background: var(--sk-accent-soft);
 }
 
-body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip_remove:hover {
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_list_row button {
+    color: var(--sk-text);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_list_remove:hover {
     background: var(--sk-hl-color, var(--sk-accent));
     color: var(--sk-bg);
     opacity: 1;
 }
 
-body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip_move:hover {
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_list_move:hover {
     background: var(--sk-accent);
     color: var(--sk-bg);
     opacity: 1;
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_list_empty {
+    color: var(--sk-text-muted);
 }
 
 /* Tabs — themed */
