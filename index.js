@@ -27,7 +27,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     maxInject: 12,      // max phrases sent to the model
     injectTemplate:
         "[System note — writing variety]\n" +
-        "STRICTLY FORBIDDEN — never write these phrases or any close variation, under any circumstance: {{banned}}.\n" +
+        "STRICTLY FORBIDDEN — Under no circumstances, never write these phrases or any close variation, under any circumstance: {{banned}}.\n" +
         "Also avoid overusing these repeated phrases, or close paraphrases: {{slop}}.\n" +
         "Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
     highlightEnabled: true,
@@ -41,6 +41,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     activeTab: "banned",                   // remembered between sessions
     koreanMode: true,                      // KO stopwords + 조사/어미 변형 묶기
     customStopwords: "",                   // user stopwords (comma/newline separated)
+    detectPresets: {},                     // name -> { minN, maxN, threshold, scanDepth, koreanMode, customStopwords }
 });
 
 // Backends that support freq_pen_openai / pres_pen_openai in oai_settings.
@@ -67,6 +68,10 @@ const _filter = {
 // Old default templates — auto-upgraded to the current default on load.
 const LEGACY_INJECT_TEMPLATES = new Set([
     "[System note — writing variety] Avoid reusing the following overused phrases, or any close paraphrase, in your next reply: {{phrases}}. Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
+    "[System note — writing variety]\n" +
+        "STRICTLY FORBIDDEN — never write these phrases or any close variation, under any circumstance: {{banned}}.\n" +
+        "Also avoid overusing these repeated phrases, or close paraphrases: {{slop}}.\n" +
+        "Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
 ]);
 
 // English stopwords — phrases made of ONLY these are ignored.
@@ -859,15 +864,31 @@ function buildPanel() {
                     <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
 
                     <hr>
-                    <h4><i class="fa-solid fa-language sk_h4_icon"></i>한국어 / 불용어</h4>
+                    <h4><i class="fa-solid fa-language sk_h4_icon"></i>한국어</h4>
                     <label class="checkbox_label">
                         <input id="sk_koreanMode" type="checkbox" ${s.koreanMode ? "checked" : ""}>
                         <span>한국어 처리 (조사·어미 변형 묶기 + 한국어 불용어)</span>
                     </label>
                     <p class="sk_hint">"그녀는 / 그녀가"처럼 조사·어미만 다른 표현을 같은 표현으로 묶어 감지합니다. 한국어 RP에 권장합니다.</p>
+
+                    <hr>
+                    <h4><i class="fa-solid fa-filter sk_h4_icon"></i>불용어</h4>
                     <label>커스텀 불용어 — 감지에서 무시할 단어 (쉼표·줄바꿈 구분)</label>
-                    <textarea id="sk_customStopwords" class="text_pole sk_template" rows="2" spellcheck="false" placeholder="예: 데미안, 그녀, 오빠">${escapeHtml(s.customStopwords)}</textarea>
+                    <textarea id="sk_customStopwords" class="text_pole sk_template" rows="2" spellcheck="false">${escapeHtml(s.customStopwords)}</textarea>
                     <p class="sk_hint">캐릭터 이름이나 자주 쓰는 호칭을 넣으면 반복 후보에서 빠집니다.</p>
+
+                    <hr>
+                    <h4><i class="fa-solid fa-bookmark sk_h4_icon"></i>프리셋</h4>
+                    <p class="sk_hint">현재 감지 슬라이더 + 한국어 + 불용어 설정을 묶음으로 저장합니다.</p>
+                    <div class="sk_preset_row">
+                        <select id="sk_preset_select" class="text_pole"></select>
+                        <button id="sk_preset_load" class="menu_button" title="선택한 프리셋 적용">불러오기</button>
+                        <button id="sk_preset_delete" class="menu_button" title="선택한 프리셋 삭제">삭제</button>
+                    </div>
+                    <div class="sk_preset_row">
+                        <input id="sk_preset_name" type="text" class="text_pole" placeholder="새 프리셋 이름 (예: 한국어)">
+                        <button id="sk_preset_save" class="menu_button" title="현재 설정을 이 이름으로 저장">저장</button>
+                    </div>
                 </div>
 
                 <!-- 설정 (테마 / 프롬프트 / 페널티 / 리롤 / 하이라이트 통합) -->
@@ -990,6 +1011,83 @@ function bindPanel() {
         csEl.addEventListener("input", () => { s.customStopwords = csEl.value; });
         csEl.addEventListener("change", () => { save(); renderPanel(); refreshAllHighlights(); });
     }
+
+    // ---- 감지 프리셋 ----
+    const presetSel  = document.getElementById("sk_preset_select");
+    const presetName = document.getElementById("sk_preset_name");
+    const presetSave = document.getElementById("sk_preset_save");
+    const presetLoad = document.getElementById("sk_preset_load");
+    const presetDel  = document.getElementById("sk_preset_delete");
+
+    function renderPresetSelect(selectedName) {
+        if (!presetSel) return;
+        const names = Object.keys(s.detectPresets || {}).sort((a, b) => a.localeCompare(b, "ko"));
+        if (!names.length) {
+            presetSel.innerHTML = `<option value="">— 저장된 프리셋 없음 —</option>`;
+            presetSel.disabled = true;
+        } else {
+            presetSel.disabled = false;
+            presetSel.innerHTML = names.map(n =>
+                `<option value="${escapeHtml(n)}"${n === selectedName ? " selected" : ""}>${escapeHtml(n)}</option>`
+            ).join("");
+        }
+    }
+
+    function applyPresetValues(p) {
+        // Settings
+        if (typeof p.minN       === "number") s.minN       = p.minN;
+        if (typeof p.maxN       === "number") s.maxN       = p.maxN;
+        if (typeof p.threshold  === "number") s.threshold  = p.threshold;
+        if (typeof p.scanDepth  === "number") s.scanDepth  = p.scanDepth;
+        if (typeof p.koreanMode === "boolean") s.koreanMode = p.koreanMode;
+        if (typeof p.customStopwords === "string") s.customStopwords = p.customStopwords;
+
+        // Sliders + their _val labels
+        for (const k of ["minN", "maxN", "threshold", "scanDepth"]) {
+            const el  = document.getElementById(`sk_${k}`);
+            const lbl = document.getElementById(`sk_${k}_val`);
+            if (el)  el.value = s[k];
+            if (lbl) lbl.textContent = String(s[k]);
+        }
+        const kEl = document.getElementById("sk_koreanMode");
+        if (kEl) kEl.checked = !!s.koreanMode;
+        if (csEl) csEl.value = s.customStopwords || "";
+    }
+
+    presetSave?.addEventListener("click", () => {
+        const name = (presetName?.value || "").trim();
+        if (!name) { toastr?.warning?.("프리셋 이름을 입력하세요"); return; }
+        s.detectPresets[name] = {
+            minN: s.minN, maxN: s.maxN, threshold: s.threshold, scanDepth: s.scanDepth,
+            koreanMode: !!s.koreanMode, customStopwords: s.customStopwords || "",
+        };
+        save();
+        renderPresetSelect(name);
+        if (presetName) presetName.value = "";
+        toastr?.success?.(`프리셋 저장: ${name}`);
+    });
+
+    presetLoad?.addEventListener("click", () => {
+        const name = presetSel?.value;
+        const p = name && s.detectPresets?.[name];
+        if (!p) { toastr?.warning?.("프리셋을 선택하세요"); return; }
+        applyPresetValues(p);
+        save();
+        renderPanel();
+        refreshAllHighlights();
+        toastr?.success?.(`프리셋 적용: ${name}`);
+    });
+
+    presetDel?.addEventListener("click", () => {
+        const name = presetSel?.value;
+        if (!name || !s.detectPresets?.[name]) { toastr?.warning?.("프리셋을 선택하세요"); return; }
+        delete s.detectPresets[name];
+        save();
+        renderPresetSelect();
+        toastr?.info?.(`프리셋 삭제: ${name}`);
+    });
+
+    renderPresetSelect();
 
     bindCheckbox("sk_injectEnabled", "injectEnabled");
     bindSlider("sk_maxInject", "maxInject");

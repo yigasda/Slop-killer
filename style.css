@@ -327,6 +327,25 @@ body[data-sk-theme] #slop_killer_panel hr {
     flex: 1;
 }
 
+/* Detect-preset row */
+.sk_preset_row {
+    display: flex;
+    gap: 6px;
+    margin: 4px 0 6px;
+    align-items: center;
+}
+
+.sk_preset_row .text_pole,
+.sk_preset_row select.text_pole {
+    flex: 1;
+    min-width: 0;
+}
+
+.sk_preset_row .menu_button {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
 /* Current character name accent */
 .sk_charname {
     color: var(--SmartThemeQuoteColor);
