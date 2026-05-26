@@ -90,7 +90,15 @@ const KO_STOPWORDS = new Set((
     "나 너 우리 너희 당신 그대 자기 저희 " +
     "그녀 그들 이것 그것 저것 여기 거기 저기 " +
     "정말 진짜 너무 매우 아주 더 덜 좀 잘 막 또 다시 그냥 마치 거의 " +
-    "이런 그런 저런 어떤 무슨 모든 여러 가장"
+    "이런 그런 저런 어떤 무슨 모든 여러 가장 " +
+    // 추가 — 한국어 RP에서 고빈도·저정보 단어
+    "지금 이제 아직 이미 역시 항상 계속 자꾸 여전히 " +
+    "내 난 넌 제 걔 쟤 " +
+    "게 건 걸 줄 데 바 " +
+    "아니 아니라 아닌 않고 않아 않은 안 못 " +
+    "없다 없어 없는 없고 있다 있어 있는 있고 " +
+    "하지 하고 하며 해서 해야 했다 했어 됐다 됐어 " +
+    "말고 뿐이야 뿐이에요"
 ).split(/\s+/).filter(Boolean));
 
 // Korean particles / endings stripped (longest match first) to group inflected
@@ -217,6 +225,23 @@ function stripKoSuffix(w) {
     return w;
 }
 
+// Returns false if a normalized Korean token is stopword-like:
+// catches cases where the strict stripKoSuffix couldn't reduce (stem would be
+// 1 char), so words like "수가"→stem"수" or "없는"→stem"없" are filtered.
+function isKoContentWord(tok, stop) {
+    if (stop.has(tok)) return false;
+    if (!isHangulToken(tok)) return true;
+    if (tok.length <= 1) return false;
+    for (const suf of KO_SUFFIXES) {
+        if (tok.endsWith(suf) && tok.length > suf.length) {
+            const looseStem = tok.slice(0, -suf.length);
+            if (looseStem.length <= 1 || stop.has(looseStem)) return false;
+            break;
+        }
+    }
+    return true;
+}
+
 // Effective stopword set = English ∪ Korean ∪ custom.
 function effectiveStopwords() {
     const s = getSettings();
@@ -251,7 +276,7 @@ function computeCounts() {
             for (let n = s.minN; n <= s.maxN; n++) {
                 for (let i = 0; i + n <= surf.length; i++) {
                     const normGram = norm.slice(i, i + n);
-                    if (normGram.filter(w => !stop.has(w)).length < 2) continue;
+                    if (normGram.filter(w => isKoContentWord(w, stop)).length < 2) continue;
                     const key = normGram.join(" ");
                     let e = agg.get(key);
                     if (!e) { e = { count: 0, surfaces: new Map() }; agg.set(key, e); }
