@@ -190,11 +190,16 @@ function mergeChains(entries) {
 }
 
 // Deduped representatives (one per repeated run) — for display + injection.
+// Already-banned phrases (and fragments overlapping them) are dropped so the
+// ranking only shows phrases that haven't been categorized yet.
 function rankSlop() {
+    const banned = getCharData(getCurrentCharName()).banned.map(x => x.toLowerCase());
+    const isBanned = p => banned.includes(p) || banned.some(b => overlaps(b, p));
     const merged = mergeChains(aboveThreshold())
         .sort((a, b) => b.count - a.count || b.phrase.length - a.phrase.length);
     const kept = [];
     for (const { phrase, count } of merged) {
+        if (isBanned(phrase)) continue;
         if (kept.some(k => overlaps(k.phrase, phrase))) continue;
         kept.push({ phrase, count });
     }
@@ -638,7 +643,8 @@ function buildPanel() {
                 <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
 
                 <hr>
-                <h4>수동 금지어</h4>
+                <h4>등록된 금지어</h4>
+                <p class="sk_hint">위 자동 감지 목록에서 🚫를 누르거나, 아래에 직접 입력해 추가할 수 있습니다. 출처와 무관하게 모두 여기 모입니다.</p>
                 <div style="display:flex; gap:6px;">
                     <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력" style="flex:1;">
                     <button id="sk_ban_add" class="menu_button">추가</button>
