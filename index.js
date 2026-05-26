@@ -1100,6 +1100,111 @@ function renderChipBox(id, list, kind, scope, filter) {
 }
 
 // ====================================================================
+// Chat context-menu — right-click or long-press on AI messages
+// ====================================================================
+let _ctxMenu = null;
+let _longPressTimer = null;
+
+function wordAtCaret(range) {
+    const node = range.startContainer;
+    if (!node || node.nodeType !== Node.TEXT_NODE) return null;
+    const text = node.textContent;
+    const off = range.startOffset;
+    let s = off, e = off;
+    while (s > 0 && /[\p{L}\p{N}']/u.test(text[s - 1])) s--;
+    while (e < text.length && /[\p{L}\p{N}']/u.test(text[e])) e++;
+    return text.slice(s, e).trim() || null;
+}
+
+function phraseFromEvent(target, x, y) {
+    const hl = target.closest?.(".slop-hl");
+    if (hl) return hl.textContent.trim();
+    const sel = window.getSelection();
+    const selText = sel?.toString().trim().replace(/\s+/g, " ") ?? "";
+    if (selText && selText.length < 120) return selText;
+    let range = null;
+    if (document.caretRangeFromPoint) {
+        range = document.caretRangeFromPoint(x, y);
+    } else if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(x, y);
+        if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); }
+    }
+    return range ? wordAtCaret(range) : null;
+}
+
+function showCtxMenu(x, y, phrase) {
+    hideCtxMenu();
+    if (!phrase) return;
+
+    const menu = document.createElement("div");
+    menu.className = "sk_ctx_menu";
+    menu.innerHTML = `
+        <span class="sk_ctx_phrase">"${escapeHtml(phrase)}"</span>
+        <button class="sk_ctx_btn">🚫 금지어 추가</button>
+    `;
+    document.body.appendChild(menu);
+    _ctxMenu = menu;
+
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const mw = 220, mh = 72;
+    const left = Math.max(8, Math.min(x, vw - mw - 8));
+    const top  = (y + mh + 12 > vh) ? y - mh - 8 : y + 10;
+    menu.style.left = `${left}px`;
+    menu.style.top  = `${Math.max(8, top)}px`;
+
+    menu.querySelector(".sk_ctx_btn").addEventListener("click", () => {
+        addBanned(phrase);
+        showCtxToast(`"${phrase}" 추가됨`);
+        hideCtxMenu();
+    });
+
+    setTimeout(() => document.addEventListener("pointerdown", _ctxOutside, { capture: true, once: true }), 0);
+}
+
+function _ctxOutside(e) { if (!_ctxMenu?.contains(e.target)) hideCtxMenu(); }
+
+function hideCtxMenu() { _ctxMenu?.remove(); _ctxMenu = null; }
+
+function showCtxToast(msg) {
+    const t = document.createElement("div");
+    t.className = "sk_toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2000);
+}
+
+function initChatContextMenu() {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    chat.addEventListener("contextmenu", (e) => {
+        const mes = e.target.closest(".mes");
+        if (!mes || mes.getAttribute("is_user") === "true") return;
+        e.preventDefault();
+        const phrase = phraseFromEvent(e.target, e.clientX, e.clientY);
+        if (phrase) showCtxMenu(e.clientX, e.clientY, phrase);
+    });
+
+    chat.addEventListener("touchstart", (e) => {
+        const mes = e.target.closest(".mes");
+        if (!mes || mes.getAttribute("is_user") === "true") return;
+        const touch = e.touches[0];
+        const target = e.target;
+        _longPressTimer = setTimeout(() => {
+            const phrase = phraseFromEvent(target, touch.clientX, touch.clientY);
+            if (phrase) { navigator.vibrate?.(40); showCtxMenu(touch.clientX, touch.clientY, phrase); }
+        }, 500);
+    }, { passive: true });
+
+    const cancelLp = () => clearTimeout(_longPressTimer);
+    chat.addEventListener("touchmove",   cancelLp, { passive: true });
+    chat.addEventListener("touchend",    cancelLp, { passive: true });
+    chat.addEventListener("touchcancel", cancelLp, { passive: true });
+
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideCtxMenu(); });
+}
+
+// ====================================================================
 // Init
 // ====================================================================
 jQuery(() => {
@@ -1110,6 +1215,7 @@ jQuery(() => {
         applyColor();
         buildPanel();
         applyTheme();
+        initChatContextMenu();
 
         // MESSAGE_RECEIVED fires only for freshly generated replies (not on chat
         // load, not on abort), so we use it to mark which message is eligible for

@@ -1,5 +1,83 @@
 /* Slop Killer */
 
+/* ====================================================================
+   Chat context popup — right-click / long-press to ban
+==================================================================== */
+.sk_ctx_menu {
+    position: fixed;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 6px 12px;
+    background: var(--SmartThemeBlurTintColor, rgba(22, 22, 30, 0.96));
+    color: var(--SmartThemeBodyColor, #e8e5db);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 20px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    animation: sk_ctx_pop 120ms cubic-bezier(0.34, 1.4, 0.64, 1);
+    max-width: 300px;
+    pointer-events: auto;
+}
+
+@keyframes sk_ctx_pop {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.sk_ctx_phrase {
+    font-size: 0.82em;
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+}
+
+.sk_ctx_btn {
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: inherit;
+    border-radius: 14px;
+    padding: 4px 10px;
+    font-size: 0.82em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 100ms ease;
+}
+
+.sk_ctx_btn:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* Toast */
+.sk_toast {
+    position: fixed;
+    bottom: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10001;
+    background: rgba(22, 22, 30, 0.92);
+    color: #e8e5db;
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    white-space: nowrap;
+    pointer-events: none;
+    animation: sk_toast_in 180ms ease, sk_toast_out 180ms 1820ms ease forwards;
+}
+
+@keyframes sk_toast_in {
+    from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes sk_toast_out {
+    to   { opacity: 0; transform: translateX(-50%) translateY(6px); }
+}
+
 .slop-hl {
     background: var(--sk-hl-bg, rgba(255, 107, 107, 0.18));
     text-decoration: underline wavy var(--sk-hl-color, #ff6b6b);
