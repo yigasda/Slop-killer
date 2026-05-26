@@ -337,24 +337,19 @@ async function maybeReroll(rawId) {
     const spent = _rerollCount.get(mesId) || 0;
     if (spent >= s.rerollMax) return;
 
-    console.log(`[SlopKiller] 리롤 시작 — mesId:${mesId}, 감지된 금지어:${phrases.join(", ")}`);
     _rerollBusy = true;
     try {
         let cur = msg;
         for (let attempt = spent; attempt < s.rerollMax; attempt++) {
             const kept = truncateForReroll(cur.mes, phrases);
-            if (kept === null) { console.log("[SlopKiller] 보존할 문장 없음, 리롤 중단"); break; }
-            console.log(`[SlopKiller] 시도 ${attempt + 1}/${s.rerollMax} — 앞부분 보존: "${kept.slice(-40)}"`);
+            if (kept === null) break;                 // nothing to salvage — leave as-is
             cur.mes = kept;
             c.updateMessageBlock(mesId, cur);
             await c.saveChat();
             _rerollCount.set(mesId, attempt + 1);
             await c.executeSlashCommandsWithOptions("/continue");
             cur = c.chat[mesId];                       // continue may replace the object
-            if (!cur || earliestBannedPos(cur.mes, phrases) < 0) {
-                console.log("[SlopKiller] 리롤 성공 — 금지어 없음");
-                break;
-            }
+            if (!cur || earliestBannedPos(cur.mes, phrases) < 0) break;
         }
     } catch (err) {
         console.error("[SlopKiller] auto-reroll error:", err);
@@ -362,27 +357,6 @@ async function maybeReroll(rawId) {
         _rerollBusy = false;
         refreshAllHighlights();
     }
-}
-
-// Debug helper — injects a banned phrase into the last AI message and triggers reroll.
-async function debugTestReroll() {
-    const c = ctx();
-    const chat = c.chat || [];
-    const phrases = getCharData(getCurrentCharName()).banned;
-    if (!phrases.length) { alert("금지어가 없습니다. 먼저 금지어를 등록하세요."); return; }
-    let mesId = -1;
-    for (let i = chat.length - 1; i >= 0; i--) {
-        if (!chat[i].is_user && !chat[i].is_system) { mesId = i; break; }
-    }
-    if (mesId < 0) { alert("AI 메시지가 없습니다."); return; }
-    if (mesId !== chat.length - 1) { alert("마지막 메시지가 AI 메시지여야 합니다.\n(지금은 유저 메시지가 마지막입니다.)"); return; }
-    const inject = phrases[0];
-    const msg = chat[mesId];
-    msg.mes = msg.mes.trimEnd() + " " + inject;
-    c.updateMessageBlock(mesId, msg);
-    await c.saveChat();
-    console.log(`[SlopKiller] 테스트 주입 완료 — mesId:${mesId}, 주입어:"${inject}". 리롤 시작...`);
-    setTimeout(() => maybeReroll(mesId), 0);
 }
 
 // ====================================================================
@@ -604,49 +578,47 @@ function buildPanel() {
 
                 <hr>
                 <h4>감지 설정</h4>
-                <label>구절 길이 — 최소 <span id="sk_minN_val">${s.minN}</span> 단어</label>
+                <label>표현 길이 — 짧게는 <span id="sk_minN_val">${s.minN}</span> 단어</label>
                 <input id="sk_minN" type="range" min="1" max="5" value="${s.minN}" class="sk_slider">
-                <label>구절 길이 — 최대 <span id="sk_maxN_val">${s.maxN}</span> 단어</label>
+                <label>표현 길이 — 길게는 <span id="sk_maxN_val">${s.maxN}</span> 단어</label>
                 <input id="sk_maxN" type="range" min="1" max="6" value="${s.maxN}" class="sk_slider">
-                <label>슬롭 판정 임계 — <span id="sk_threshold_val">${s.threshold}</span>회 이상</label>
+                <label>반복으로 볼 기준 — <span id="sk_threshold_val">${s.threshold}</span>회 이상</label>
                 <input id="sk_threshold" type="range" min="2" max="15" value="${s.threshold}" class="sk_slider">
-                <label>스캔 범위 — 최근 <span id="sk_scanDepth_val">${s.scanDepth}</span>개 메시지</label>
+                <label>훑어볼 범위 — 최근 <span id="sk_scanDepth_val">${s.scanDepth}</span>개 메시지</label>
                 <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
 
                 <hr>
-                <h4>프롬프트 주입</h4>
+                <h4>미리 알려주기 (프롬프트)</h4>
                 <label class="checkbox_label">
                     <input id="sk_injectEnabled" type="checkbox" ${s.injectEnabled ? "checked" : ""}>
-                    <span>생성 직전 "이 표현 피하라" 자동 주입</span>
+                    <span>사용</span>
                 </label>
-                <label>주입 최대 개수 — <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
+                <label>한 번에 알려줄 표현 — 최대 <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
                 <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
-                <label>주입 문구 (템플릿)</label>
-                <p class="sk_hint"><code>{{banned}}</code> 수동 금지어, <code>{{slop}}</code> 자동 감지어, <code>{{phrases}}</code> 둘 다. 목록이 비면 그 줄은 자동 생략됩니다.</p>
+                <label>모델에게 보낼 문구</label>
+                <p class="sk_hint"><code>{{banned}}</code> 자리엔 등록한 금지어, <code>{{slop}}</code> 자리엔 자동으로 찾은 반복 표현, <code>{{phrases}}</code> 자리엔 둘 다 들어가요. 해당 목록이 비어 있으면 그 줄은 알아서 빠집니다.</p>
                 <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
                 <button id="sk_injectReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
 
                 <hr>
-                <h4>반복 패널티 부스트</h4>
+                <h4>반복 페널티 올리기</h4>
                 <label class="checkbox_label">
                     <input id="sk_penaltyEnabled" type="checkbox" ${s.penaltyEnabled ? "checked" : ""}>
-                    <span>슬롭 감지 시 frequency / presence penalty 자동 상승</span>
+                    <span>반복이 잡히면 frequency / presence penalty를 자동으로 올려줘요</span>
                 </label>
-                <p class="sk_hint">OpenAI 호환·DeepSeek 백엔드에서만 작동합니다. Gemini·Claude는 무시됩니다.</p>
+                <p class="sk_hint">오픈AI 호환 백엔드(예: DeepSeek, Groq, Mistral, OpenRouter, xAI 등)에서만 먹혀요. Gemini·Claude에서는 그냥 무시됩니다.</p>
                 <label>부스트 강도 — <span id="sk_penaltyBoost_val">${s.penaltyBoost}</span></label>
                 <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
 
                 <hr>
-                <h4>자동 리롤 (금지어 강제)</h4>
+                <h4>자동 다시쓰기</h4>
                 <label class="checkbox_label">
                     <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
-                    <span>수동 금지어가 출력에 나오면 자동으로 다시 생성</span>
+                    <span>등록한 금지어가 답변에 나오면 알아서 다시 써줘요</span>
                 </label>
-                <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기(continue)로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
-                <label>최대 재시도 — <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
+                <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
+                <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
                 <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
-                <button id="sk_test_reroll" class="menu_button sk_reset_btn">리롤 테스트</button>
-                <p class="sk_hint">등록된 금지어를 마지막 AI 메시지에 주입해 자동 리롤 동작을 즉시 확인합니다. 콘솔(F12)에 진행 로그가 출력됩니다.</p>
 
                 <hr>
                 <h4>하이라이트</h4>
@@ -666,20 +638,20 @@ function buildPanel() {
 
                 <hr>
                 <h4>현재 캐릭터: <span id="sk_charname" style="color:var(--SmartThemeQuoteColor);"></span></h4>
-                <p class="sk_hint">감지된 반복 표현 (빈도순). 🚫 = 금지어로 추가, ✓ = 이건 슬롭 아님(제외)</p>
+                <p class="sk_hint">자주 반복된 표현이에요 (많은 순). 🚫 누르면 금지어로 추가 · ✓ 누르면 반복 아님으로 제외</p>
                 <div id="sk_ranking" class="sk_ranking"></div>
                 <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
 
                 <hr>
                 <h4>등록된 금지어</h4>
-                <p class="sk_hint">위 자동 감지 목록에서 🚫를 누르거나, 아래에 직접 입력해 추가할 수 있습니다. 출처와 무관하게 모두 여기 모입니다.</p>
+                <p class="sk_hint">위 목록에서 🚫를 누르거나, 아래 칸에 직접 입력해 추가할 수 있어요.</p>
                 <div style="display:flex; gap:6px;">
                     <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력" style="flex:1;">
                     <button id="sk_ban_add" class="menu_button">추가</button>
                 </div>
                 <div id="sk_banned_list" class="sk_chips"></div>
 
-                <h4 style="margin-top:10px;">허용어 (슬롭 아님)</h4>
+                <h4 style="margin-top:10px;">허용어 (반복 아님)</h4>
                 <div id="sk_allowed_list" class="sk_chips"></div>
 
             </div>
@@ -736,7 +708,6 @@ function bindPanel() {
 
     bindCheckbox("sk_autoReroll", "autoReroll");
     bindSlider("sk_rerollMax", "rerollMax");
-    document.getElementById("sk_test_reroll").addEventListener("click", debugTestReroll);
 
     bindCheckbox("sk_highlightEnabled", "highlightEnabled", refreshAllHighlights);
 
@@ -806,11 +777,11 @@ function renderRanking() {
     const nameEl = document.getElementById("sk_charname");
     if (nameEl) nameEl.textContent = name || "(선택 안 됨)";
 
-    if (!name) { box.innerHTML = `<div class="sk_hint">캐릭터를 선택하세요</div>`; return; }
+    if (!name) { box.innerHTML = `<div class="sk_hint">먼저 캐릭터를 선택해 주세요</div>`; return; }
 
     const list = rankSlop();
     if (!list.length) {
-        box.innerHTML = `<div class="sk_hint">감지된 반복 표현 없음 (임계 ${getSettings().threshold}회 이상)</div>`;
+        box.innerHTML = `<div class="sk_hint">아직 반복된 표현이 없어요 (${getSettings().threshold}회 이상 반복되면 여기 떠요)</div>`;
         return;
     }
 
@@ -819,7 +790,7 @@ function renderRanking() {
             <span class="sk_rank_count">×${count}</span>
             <span class="sk_rank_phrase">${escapeHtml(phrase)}</span>
             <button class="menu_button sk_ban_btn" data-p="${escapeHtml(phrase)}" title="금지어로 추가">🚫</button>
-            <button class="menu_button sk_allow_btn" data-p="${escapeHtml(phrase)}" title="이건 슬롭 아님">✓</button>
+            <button class="menu_button sk_allow_btn" data-p="${escapeHtml(phrase)}" title="반복 아님으로 제외">✓</button>
         </div>`).join("");
 
     box.querySelectorAll(".sk_ban_btn").forEach(b =>
