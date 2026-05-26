@@ -39,6 +39,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     characters: {},     // charName -> { banned: [], allowed: [] }
     global: { banned: [], allowed: [] },   // applied across every character
     activeTab: "banned",                   // remembered between sessions
+    koreanMode: true,                      // KO stopwords + 조사/어미 변형 묶기
+    customStopwords: "",                   // user stopwords (comma/newline separated)
 });
 
 // Backends that support freq_pen_openai / pres_pen_openai in oai_settings.
@@ -76,6 +78,29 @@ const STOPWORDS = new Set((
     "most some any all out up down off there here what which who whom from by what's " +
     "i'm you're he's she's they're we're it's don't didn't won't can't"
 ).split(/\s+/));
+
+// Common Korean function words / fillers — ignored in detection (parallels STOPWORDS).
+const KO_STOPWORDS = new Set((
+    "그리고 그러나 하지만 그래서 그런데 그러면 그러니까 그리하여 그래도 또한 " +
+    "그 이 저 것 거 수 등 때 곳 점 채 뿐 만큼 대로 " +
+    "나 너 우리 너희 당신 그대 자기 저희 " +
+    "그녀 그들 이것 그것 저것 여기 거기 저기 " +
+    "정말 진짜 너무 매우 아주 더 덜 좀 잘 막 또 다시 그냥 마치 거의 " +
+    "이런 그런 저런 어떤 무슨 모든 여러 가장"
+).split(/\s+/).filter(Boolean));
+
+// Korean particles / endings stripped (longest match first) to group inflected
+// variants ("그녀는"/"그녀가" → "그녀"). Heuristic: only when the remaining stem
+// is ≥ 2 Hangul chars, so short nouns like "바다" stay intact.
+const KO_SUFFIXES = [
+    "이라고", "이라는", "으로부터", "로부터", "에게서", "한테서", "으로서", "으로써", "에서는",
+    "었습니다", "았습니다", "였습니다", "습니다",
+    "라고", "라는", "에게", "한테", "께서", "처럼", "보다", "마다", "조차", "마저",
+    "이라도", "라도", "까지", "부터", "에서", "으로",
+    "었다", "았다", "였다", "는다", "겠다", "는데", "은데", "면서", "으며", "지만",
+    "어서", "아서", "니까", "구나", "네요", "어요", "아요", "에요", "예요",
+    "은", "는", "이", "가", "을", "를", "에", "의", "도", "만", "과", "와", "로", "나", "고", "며", "다", "요",
+].sort((a, b) => b.length - a.length);
 
 // ====================================================================
 // Context helpers
@@ -159,26 +184,68 @@ function tokenize(text) {
         .filter(Boolean);
 }
 
-function contentWordCount(words) { return words.filter(w => !STOPWORDS.has(w)).length; }
+function isHangulToken(w) { return /^[가-힣]+$/.test(w); }
 
+// Strip one trailing particle/ending to normalize Korean inflected variants.
+function stripKoSuffix(w) {
+    if (!isHangulToken(w)) return w;
+    for (const suf of KO_SUFFIXES) {
+        if (w.length > suf.length && w.length - suf.length >= 2 && w.endsWith(suf)) {
+            return w.slice(0, -suf.length);
+        }
+    }
+    return w;
+}
+
+// Effective stopword set = English ∪ (Korean if enabled) ∪ custom.
+function effectiveStopwords() {
+    const s = getSettings();
+    const set = new Set(STOPWORDS);
+    if (s.koreanMode) for (const w of KO_STOPWORDS) set.add(w);
+    if (s.customStopwords) {
+        for (const w of String(s.customStopwords).split(/[\s,]+/)) {
+            const k = w.trim().toLowerCase();
+            if (k) set.add(k);
+        }
+    }
+    return set;
+}
+
+// Count n-grams across recent AI messages. When Korean mode is on, n-grams are
+// keyed by their suffix-stripped (normalized) form so inflected variants merge,
+// while the most frequent surface form is kept as the display representative.
 function computeCounts() {
     const s = getSettings();
+    const stop = effectiveStopwords();
+    const ko = !!s.koreanMode;
     const chat = ctx().chat || [];
     const msgs = chat.filter(m =>
         m && !m.is_user && !m.is_system && typeof m.mes === "string" && m.mes.trim()
     ).slice(-s.scanDepth);
 
-    const counts = new Map();
+    const agg = new Map();   // normKey -> { count, surfaces: Map<surface, count> }
     for (const m of msgs) {
-        const words = tokenize(m.mes);
+        const surf = tokenize(m.mes);
+        const norm = ko ? surf.map(stripKoSuffix) : surf;
         for (let n = s.minN; n <= s.maxN; n++) {
-            for (let i = 0; i + n <= words.length; i++) {
-                const gram = words.slice(i, i + n);
-                if (contentWordCount(gram) < 2) continue;
-                const key = gram.join(" ");
-                counts.set(key, (counts.get(key) || 0) + 1);
+            for (let i = 0; i + n <= surf.length; i++) {
+                const normGram = norm.slice(i, i + n);
+                if (normGram.filter(w => !stop.has(w)).length < 2) continue;
+                const key = normGram.join(" ");
+                let e = agg.get(key);
+                if (!e) { e = { count: 0, surfaces: new Map() }; agg.set(key, e); }
+                e.count++;
+                const sf = surf.slice(i, i + n).join(" ");
+                e.surfaces.set(sf, (e.surfaces.get(sf) || 0) + 1);
             }
         }
+    }
+
+    const counts = new Map();
+    for (const e of agg.values()) {
+        let rep = "", best = -1;
+        for (const [sf, c] of e.surfaces) if (c > best) { best = c; rep = sf; }
+        counts.set(rep, (counts.get(rep) || 0) + e.count);
     }
     return counts;
 }
@@ -790,6 +857,17 @@ function buildPanel() {
                     <input id="sk_threshold" type="range" min="2" max="15" value="${s.threshold}" class="sk_slider">
                     <label>훑어볼 범위 — 최근 <span id="sk_scanDepth_val">${s.scanDepth}</span>개 메시지</label>
                     <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
+
+                    <hr>
+                    <h4><i class="fa-solid fa-language sk_h4_icon"></i>한국어 / 불용어</h4>
+                    <label class="checkbox_label">
+                        <input id="sk_koreanMode" type="checkbox" ${s.koreanMode ? "checked" : ""}>
+                        <span>한국어 처리 (조사·어미 변형 묶기 + 한국어 불용어)</span>
+                    </label>
+                    <p class="sk_hint">"그녀는 / 그녀가"처럼 조사·어미만 다른 표현을 같은 표현으로 묶어 감지합니다. 한국어 RP에 권장합니다.</p>
+                    <label>커스텀 불용어 — 감지에서 무시할 단어 (쉼표·줄바꿈 구분)</label>
+                    <textarea id="sk_customStopwords" class="text_pole sk_template" rows="2" spellcheck="false" placeholder="예: 데미안, 그녀, 오빠">${escapeHtml(s.customStopwords)}</textarea>
+                    <p class="sk_hint">캐릭터 이름이나 자주 쓰는 호칭을 넣으면 반복 후보에서 빠집니다.</p>
                 </div>
 
                 <!-- 설정 (테마 / 프롬프트 / 페널티 / 리롤 / 하이라이트 통합) -->
@@ -905,6 +983,13 @@ function bindPanel() {
     bindSlider("sk_maxN", "maxN", parseInt, () => { renderPanel(); refreshAllHighlights(); });
     bindSlider("sk_threshold", "threshold", parseInt, () => { renderPanel(); refreshAllHighlights(); });
     bindSlider("sk_scanDepth", "scanDepth", parseInt, () => { renderPanel(); refreshAllHighlights(); });
+
+    bindCheckbox("sk_koreanMode", "koreanMode", () => { renderPanel(); refreshAllHighlights(); });
+    const csEl = document.getElementById("sk_customStopwords");
+    if (csEl) {
+        csEl.addEventListener("input", () => { s.customStopwords = csEl.value; });
+        csEl.addEventListener("change", () => { save(); renderPanel(); refreshAllHighlights(); });
+    }
 
     bindCheckbox("sk_injectEnabled", "injectEnabled");
     bindSlider("sk_maxInject", "maxInject");
