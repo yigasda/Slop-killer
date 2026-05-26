@@ -14,10 +14,11 @@ const PASTEL_CHIPS = [
 
 const TABS = ["banned", "global", "detect", "settings"];
 const SEARCH_THRESHOLD = 10;   // show search/sort UI when list has ≥ this many items
+const VALID_THEMES = new Set(["mono", "rose", "mint", "sky"]);
 
 const DEFAULT_SETTINGS = Object.freeze({
     enabled: true,
-    theme: "cream",     // system | mono | cream | peach | lilac
+    theme: "rose",      // mono | rose | mint | sky
     minN: 2,            // shortest phrase length (words)
     maxN: 4,            // longest phrase length (words)
     threshold: 3,       // occurrences needed to count as slop
@@ -93,7 +94,7 @@ function getSettings() {
         if (!Object.hasOwn(s, k)) s[k] = structuredClone(DEFAULT_SETTINGS[k]);
     }
     if (LEGACY_INJECT_TEMPLATES.has(s.injectTemplate)) s.injectTemplate = DEFAULT_SETTINGS.injectTemplate;
-    if (s.theme === "system") s.theme = "cream";
+    if (!VALID_THEMES.has(s.theme)) s.theme = DEFAULT_SETTINGS.theme;
     return s;
 }
 
@@ -554,10 +555,10 @@ function applyColor() {
 
 // ====================================================================
 // Theme — sets data-sk-theme on <body>; all panel styling is variable-driven
-// in style.css. "system" leaves the panel in native ST appearance.
+// in style.css. Themes: mono (flat B/W) + rose / mint / sky pastels.
 // ====================================================================
 function applyTheme() {
-    const theme = getSettings().theme || "cream";
+    const theme = getSettings().theme || DEFAULT_SETTINGS.theme;
     document.body.setAttribute("data-sk-theme", theme);
     document.querySelectorAll("#slop_killer_panel .sk_theme_btn").forEach(btn => {
         btn.classList.toggle("sk_theme_active", btn.dataset.theme === theme);
@@ -795,10 +796,10 @@ function buildPanel() {
                 <div class="sk_tab_panel" data-tab="settings" hidden>
                     <h4><i class="fa-solid fa-palette sk_h4_icon"></i>테마</h4>
                     <div class="sk_theme_picker">
-                        <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
-                        <button class="sk_theme_btn" data-theme="cream"  title="Cream (베이지)"></button>
-                        <button class="sk_theme_btn" data-theme="peach"  title="Peach (피치)"></button>
-                        <button class="sk_theme_btn" data-theme="lilac"  title="Lilac (연보라)"></button>
+                        <button class="sk_theme_btn" data-theme="mono" title="Mono (흑백)"></button>
+                        <button class="sk_theme_btn" data-theme="rose" title="Rose (로즈)"></button>
+                        <button class="sk_theme_btn" data-theme="mint" title="Mint (민트)"></button>
+                        <button class="sk_theme_btn" data-theme="sky"  title="Sky (스카이)"></button>
                     </div>
 
                     <hr>

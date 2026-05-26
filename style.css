@@ -400,17 +400,17 @@ body[data-sk-theme] #slop_killer_panel hr {
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
-.sk_theme_btn[data-theme="mono"]   { background: #c8ccd8; }
-.sk_theme_btn[data-theme="cream"]  { background: #f5e5b8; }
-.sk_theme_btn[data-theme="peach"]  { background: #f5c0b0; }
-.sk_theme_btn[data-theme="lilac"]  { background: #dcc4f0; }
+.sk_theme_btn[data-theme="mono"] { background: #c8ccd8; }
+.sk_theme_btn[data-theme="rose"] { background: #f7b8cc; }
+.sk_theme_btn[data-theme="mint"] { background: #a8e6c9; }
+.sk_theme_btn[data-theme="sky"]  { background: #aecbf7; }
 
 /* ====================================================================
    Theme system — variable-driven styling of #slop_killer_panel,
-   isolated via body[data-sk-theme="..."]. "system" stays native ST.
+   isolated via body[data-sk-theme="..."]. mono + rose / mint / sky.
 ==================================================================== */
 
-/* Variable defaults (shared; System falls back to ST theme colors) */
+/* Variable defaults (shared fallback) */
 body[data-sk-theme] #slop_killer_panel {
     --sk-bg: var(--SmartThemeBlurTintColor, rgba(20, 20, 28, 0.95));
     --sk-bg-elevated: rgba(255, 255, 255, 0.05);
@@ -443,52 +443,54 @@ body[data-sk-theme="mono"] #slop_killer_panel {
     --sk-fw-bold: 700;
 }
 
-body[data-sk-theme="cream"] #slop_killer_panel {
-    --sk-bg: #f5efe0;
-    --sk-bg-elevated: #ede4d0;
-    --sk-bg-card: #f0e8d6;
-    --sk-text: #3a3328;
-    --sk-text-muted: rgba(58, 51, 40, 0.65);
-    --sk-accent: #b08754;
-    --sk-accent-soft: rgba(176, 135, 84, 0.15);
-    --sk-border: rgba(58, 51, 40, 0.12);
-    --sk-radius: 12px;
-    --sk-radius-lg: 18px;
-    --sk-shadow: 0 4px 12px rgba(58, 51, 40, 0.08);
+/* Pastel variants — identical structure to mono (radius 4/8, fw 400/700,
+   flat light surface), only the hue differs. */
+body[data-sk-theme="rose"] #slop_killer_panel {
+    --sk-bg: #fff5f7;
+    --sk-bg-elevated: #ffe9ee;
+    --sk-bg-card: #fff0f3;
+    --sk-text: #6e2a3e;
+    --sk-text-muted: rgba(110, 42, 62, 0.5);
+    --sk-accent: #e6739a;
+    --sk-accent-soft: rgba(230, 115, 154, 0.12);
+    --sk-border: rgba(110, 42, 62, 0.12);
+    --sk-radius: 4px;
+    --sk-radius-lg: 8px;
+    --sk-shadow: 0 2px 8px rgba(180, 60, 100, 0.18);
     --sk-fw: 400;
-    --sk-fw-bold: 600;
+    --sk-fw-bold: 700;
 }
 
-body[data-sk-theme="peach"] #slop_killer_panel {
-    --sk-bg: #fff4ec;
-    --sk-bg-elevated: #ffe5d6;
-    --sk-bg-card: #fff0e3;
-    --sk-text: #5c3826;
-    --sk-text-muted: rgba(92, 56, 38, 0.65);
-    --sk-accent: #ff8a65;
-    --sk-accent-soft: rgba(255, 138, 101, 0.18);
-    --sk-border: rgba(92, 56, 38, 0.12);
-    --sk-radius: 14px;
-    --sk-radius-lg: 20px;
-    --sk-shadow: 0 4px 16px rgba(255, 138, 101, 0.12);
+body[data-sk-theme="mint"] #slop_killer_panel {
+    --sk-bg: #f3fcf7;
+    --sk-bg-elevated: #e2f6ec;
+    --sk-bg-card: #edfbf3;
+    --sk-text: #1f5540;
+    --sk-text-muted: rgba(31, 85, 64, 0.5);
+    --sk-accent: #3fb785;
+    --sk-accent-soft: rgba(63, 183, 133, 0.12);
+    --sk-border: rgba(31, 85, 64, 0.12);
+    --sk-radius: 4px;
+    --sk-radius-lg: 8px;
+    --sk-shadow: 0 2px 8px rgba(40, 120, 90, 0.18);
     --sk-fw: 400;
-    --sk-fw-bold: 600;
+    --sk-fw-bold: 700;
 }
 
-body[data-sk-theme="lilac"] #slop_killer_panel {
-    --sk-bg: #fefaff;
-    --sk-bg-elevated: #f5eafe;
-    --sk-bg-card: #fbf5ff;
-    --sk-text: #5c2d7a;
-    --sk-text-muted: rgba(92, 45, 122, 0.55);
-    --sk-accent: #b06dcc;
-    --sk-accent-soft: rgba(176, 109, 204, 0.13);
-    --sk-border: rgba(92, 45, 122, 0.1);
-    --sk-radius: 12px;
-    --sk-radius-lg: 18px;
-    --sk-shadow: 0 4px 20px rgba(60, 30, 90, 0.3);
+body[data-sk-theme="sky"] #slop_killer_panel {
+    --sk-bg: #f3f8ff;
+    --sk-bg-elevated: #e3eeff;
+    --sk-bg-card: #eef5ff;
+    --sk-text: #243f6b;
+    --sk-text-muted: rgba(36, 63, 107, 0.5);
+    --sk-accent: #5b8def;
+    --sk-accent-soft: rgba(91, 141, 239, 0.12);
+    --sk-border: rgba(36, 63, 107, 0.12);
+    --sk-radius: 4px;
+    --sk-radius-lg: 8px;
+    --sk-shadow: 0 2px 8px rgba(60, 100, 180, 0.18);
     --sk-fw: 400;
-    --sk-fw-bold: 600;
+    --sk-fw-bold: 700;
 }
 
 /* Apply variables to all active themes. */
