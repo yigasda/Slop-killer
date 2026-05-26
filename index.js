@@ -188,14 +188,14 @@ function tokenize(text) {
         .filter(Boolean);
 }
 
-// Split text into sentence segments (by .!?…\n) and tokenize each independently.
-// Used in computeCounts so n-grams never span a sentence boundary — critical for
-// languages with short sentences (Korean) where cross-boundary n-grams kill recall.
+// Split text into sentence segments and tokenize each independently.
+// Splits only on hard punctuation (.!?…) — NOT on newlines, so Korean
+// line-break-separated clauses stay joined and form longer n-grams.
 function tokenizeSentences(text) {
     return text
         .replace(/```[\s\S]*?```/g, " ")
         .replace(/[*_`~>#\[\]()]/g, " ")
-        .split(/[.!?…\n]+/)
+        .split(/[.!?…]+/)
         .map(seg =>
             seg.split(/\s+/)
                .map(w => w.replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, "").toLowerCase())
@@ -500,7 +500,9 @@ async function maybeReroll(rawId) {
             c.updateMessageBlock(mesId, cur);
             await c.saveChat();
             _rerollCount.set(mesId, attempt + 1);
-            await c.executeSlashCommandsWithOptions("/continue");
+            const execSlash = globalThis.executeSlashCommandsWithOptions ?? globalThis.executeSlashCommands;
+            if (!execSlash) { console.error("[SlopKiller] executeSlashCommandsWithOptions not found"); break; }
+            await execSlash("/continue");
             cur = c.chat[mesId];                       // continue may replace the object
             if (!cur || earliestBannedPos(cur.mes, phrases) < 0) break;
         }
