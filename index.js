@@ -23,8 +23,20 @@ const DEFAULT_SETTINGS = Object.freeze({
     maxInject: 12,      // max phrases sent to the model
     highlightEnabled: true,
     highlightColor: "#ff6b6b",
+    penaltyEnabled: true,
+    penaltyBoost: 0.3,  // added to freq/pres penalty on OpenAI-compatible backends
     characters: {},     // charName -> { banned: [], allowed: [] }
 });
+
+// Backends that support freq_pen_openai / pres_pen_openai in oai_settings.
+const PENALTY_BACKENDS = new Set([
+    "openai", "deepseek", "custom", "openrouter", "mistralai",
+    "groq", "azure_openai", "xai", "aimlapi", "fireworks",
+    "siliconflow", "workers_ai", "chutes", "nanogpt", "moonshot",
+]);
+
+// Saved penalty values while a generation is in-flight; restored on GENERATION_ENDED.
+let _penaltyRestore = null;
 
 // English stopwords — phrases made of ONLY these are ignored.
 const STOPWORDS = new Set((
@@ -199,26 +211,50 @@ function highlightPhrases() {
 }
 
 // ====================================================================
+// Penalty boost — temporarily raises freq/pres penalty on supported backends
+// ====================================================================
+function boostPenalty(s) {
+    const oai = SillyTavern.getContext().chatCompletionSettings;
+    if (!oai) return;
+    const source = oai.chat_completion_source || "";
+    if (!PENALTY_BACKENDS.has(source)) return;
+    _penaltyRestore = { oai, freq: oai.freq_pen_openai, pres: oai.pres_pen_openai };
+    oai.freq_pen_openai = Math.min(2, (oai.freq_pen_openai || 0) + s.penaltyBoost);
+    oai.pres_pen_openai = Math.min(2, (oai.pres_pen_openai || 0) + s.penaltyBoost);
+}
+
+function restorePenalty() {
+    if (!_penaltyRestore) return;
+    _penaltyRestore.oai.freq_pen_openai = _penaltyRestore.freq;
+    _penaltyRestore.oai.pres_pen_openai = _penaltyRestore.pres;
+    _penaltyRestore = null;
+}
+
+// ====================================================================
 // Prompt interceptor — injected before every (non-quiet) generation
 // ====================================================================
 globalThis.slopKillerInterceptor = async function (chat, _contextSize, _abort, type) {
     try {
         if (type === "quiet") return;
         const s = getSettings();
-        if (!s.enabled || !s.injectEnabled) return;
+        if (!s.enabled || (!s.injectEnabled && !s.penaltyEnabled)) return;
         if (!Array.isArray(chat) || chat.length === 0) return;
 
         const phrases = injectionPhrases(s.maxInject);
         if (phrases.length === 0) return;
 
-        const list = phrases.map(p => `"${p}"`).join(", ");
-        const note = {
-            is_user: false,
-            name: "System",
-            send_date: Date.now(),
-            mes: `[System note — writing variety] The following phrases have been overused in this conversation. Do NOT reuse them in your next reply; choose fresh, varied wording instead: ${list}.`,
-        };
-        chat.splice(chat.length - 1, 0, note);
+        if (s.injectEnabled) {
+            const list = phrases.map(p => `"${p}"`).join(", ");
+            const note = {
+                is_user: false,
+                name: "System",
+                send_date: Date.now(),
+                mes: `[System note — writing variety] The following phrases have been overused in this conversation. Do NOT reuse them in your next reply; choose fresh, varied wording instead: ${list}.`,
+            };
+            chat.splice(chat.length - 1, 0, note);
+        }
+
+        if (s.penaltyEnabled) boostPenalty(s);
     } catch (err) {
         console.error("[SlopKiller] interceptor error:", err);
     }
@@ -429,6 +465,16 @@ function buildPanel() {
                 <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
 
                 <hr>
+                <h4>반복 패널티 부스트</h4>
+                <label class="checkbox_label">
+                    <input id="sk_penaltyEnabled" type="checkbox" ${s.penaltyEnabled ? "checked" : ""}>
+                    <span>슬롭 감지 시 frequency / presence penalty 자동 상승</span>
+                </label>
+                <p class="sk_hint">OpenAI 호환·DeepSeek 백엔드에서만 작동합니다. Gemini·Claude는 무시됩니다.</p>
+                <label>부스트 강도 — <span id="sk_penaltyBoost_val">${s.penaltyBoost}</span></label>
+                <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
+
+                <hr>
                 <h4>하이라이트</h4>
                 <label class="checkbox_label">
                     <input id="sk_highlightEnabled" type="checkbox" ${s.highlightEnabled ? "checked" : ""}>
@@ -500,6 +546,9 @@ function bindPanel() {
 
     bindCheckbox("sk_injectEnabled", "injectEnabled");
     bindSlider("sk_maxInject", "maxInject");
+
+    bindCheckbox("sk_penaltyEnabled", "penaltyEnabled");
+    bindSlider("sk_penaltyBoost", "penaltyBoost", parseFloat);
 
     bindCheckbox("sk_highlightEnabled", "highlightEnabled", refreshAllHighlights);
 
@@ -619,6 +668,8 @@ jQuery(() => {
         applyColor();
         buildPanel();
         applyTheme();
+
+        eventSource.on(event_types.GENERATION_ENDED, restorePenalty);
 
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (mesId) => {
             highlightMessage(mesId);
