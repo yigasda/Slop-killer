@@ -714,6 +714,7 @@ function buildPanel() {
 
     const s = getSettings();
     const html = `
+    <div id="sk_backdrop" class="sk_backdrop" style="display:none;"></div>
     <div id="${MODULE_NAME}_panel" class="sk_window" style="display:none;">
         <div class="sk_window_header">
             <span class="sk_window_title">AI 반복 킬러</span>
@@ -1005,11 +1006,10 @@ function bindPanel() {
         });
     });
 
-    // Window chrome — close button + draggable header
+    // Window chrome — close button + backdrop click closes
     const win = document.getElementById(`${MODULE_NAME}_panel`);
     win.querySelector(".sk_window_close")?.addEventListener("click", closeWindow);
-    const header = win.querySelector(".sk_window_header");
-    if (header) makeDraggable(win, header);
+    document.getElementById("sk_backdrop")?.addEventListener("click", closeWindow);
 }
 
 function renderPanel() {
@@ -1212,22 +1212,12 @@ function initChatContextMenu() {
 // ====================================================================
 // Floating window — opened from the wand (magic-wand) menu
 // ====================================================================
-function centerWindow(win) {
-    win.style.transform = "none";
-    const rect = win.getBoundingClientRect();
-    const w = rect.width || 430;
-    const h = rect.height || 400;
-    const left = Math.max(8, (window.innerWidth - w) / 2);
-    const top = Math.max(8, (window.innerHeight - h) / 2);
-    win.style.left = `${left}px`;
-    win.style.top = `${top}px`;
-}
-
 function openWindow() {
     const win = document.getElementById(`${MODULE_NAME}_panel`);
     if (!win) return;
+    const bd = document.getElementById("sk_backdrop");
+    if (bd) bd.style.display = "block";
     win.style.display = "flex";
-    centerWindow(win);
     renderPanel();
     const menu = document.getElementById("extensionsMenu");
     if (menu) menu.style.display = "none";
@@ -1236,43 +1226,8 @@ function openWindow() {
 function closeWindow() {
     const win = document.getElementById(`${MODULE_NAME}_panel`);
     if (win) win.style.display = "none";
-}
-
-function toggleWindow() {
-    const win = document.getElementById(`${MODULE_NAME}_panel`);
-    if (!win) return;
-    if (win.style.display === "none" || !win.style.display) openWindow();
-    else closeWindow();
-}
-
-// Drag the window by its header (pointer events → works for mouse + touch).
-function makeDraggable(win, handle) {
-    let startX = 0, startY = 0, origLeft = 0, origTop = 0, dragging = false;
-    handle.addEventListener("pointerdown", (e) => {
-        if (e.target.closest(".sk_window_close")) return;
-        dragging = true;
-        const rect = win.getBoundingClientRect();
-        win.style.transform = "none";
-        win.style.left = `${rect.left}px`;
-        win.style.top = `${rect.top}px`;
-        startX = e.clientX; startY = e.clientY;
-        origLeft = rect.left; origTop = rect.top;
-        try { handle.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-        e.preventDefault();
-    });
-    handle.addEventListener("pointermove", (e) => {
-        if (!dragging) return;
-        const nl = Math.max(0, Math.min(origLeft + (e.clientX - startX), window.innerWidth - 40));
-        const nt = Math.max(0, Math.min(origTop + (e.clientY - startY), window.innerHeight - 40));
-        win.style.left = `${nl}px`;
-        win.style.top = `${nt}px`;
-    });
-    const end = (e) => {
-        dragging = false;
-        try { handle.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-    };
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
+    const bd = document.getElementById("sk_backdrop");
+    if (bd) bd.style.display = "none";
 }
 
 function addWandButton() {
