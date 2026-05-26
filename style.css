@@ -89,7 +89,7 @@
 
 #slop_killer_panel h4 {
     margin: 22px 0 12px !important;
-    font-size: 0.95em;
+    font-size: 1.05em;
     font-weight: 600;
     line-height: 1.3;
 }
@@ -99,8 +99,8 @@ body #slop_killer_panel hr,
 body[data-sk-theme] #slop_killer_panel hr {
     display: block !important;
     border: 0 !important;
-    border-top: 2px solid currentColor !important;
-    opacity: 0.35 !important;
+    border-top: 1px solid currentColor !important;
+    opacity: 0.3 !important;
     margin: 32px 0 0 !important;
     padding: 0 !important;
     height: 0 !important;
