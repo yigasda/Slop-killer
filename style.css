@@ -372,6 +372,26 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip bu
 }
 
 /* ====================================================================
+   Injection template — editable textarea + reset button
+==================================================================== */
+.sk_template {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    min-height: 64px;
+    font-size: 0.85em;
+    line-height: 1.45;
+    margin-bottom: 6px;
+}
+
+.sk_reset_btn {
+    display: block;
+    width: 100%;
+    white-space: nowrap;
+    margin-bottom: 0;
+}
+
+/* ====================================================================
    Color picker — hex input + swatch preview + pastel chip grid
 ==================================================================== */
 .sk_color_row {

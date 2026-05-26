@@ -21,6 +21,10 @@ const DEFAULT_SETTINGS = Object.freeze({
     scanDepth: 50,      // how many recent AI messages to scan
     injectEnabled: true,
     maxInject: 12,      // max phrases sent to the model
+    injectTemplate:
+        "[System note — writing variety] Avoid reusing the following overused phrases, " +
+        "or any close paraphrase, in your next reply: {{phrases}}. Vary your sentence " +
+        "structure and reach for fresh wording and new sensory detail instead.",
     highlightEnabled: true,
     highlightColor: "#ff6b6b",
     penaltyEnabled: true,
@@ -245,11 +249,15 @@ globalThis.slopKillerInterceptor = async function (chat, _contextSize, _abort, t
 
         if (s.injectEnabled) {
             const list = phrases.map(p => `"${p}"`).join(", ");
+            const template = s.injectTemplate || DEFAULT_SETTINGS.injectTemplate;
+            const mes = template.includes("{{phrases}}")
+                ? template.replaceAll("{{phrases}}", list)
+                : `${template} ${list}`;
             const note = {
                 is_user: false,
                 name: "System",
                 send_date: Date.now(),
-                mes: `[System note — writing variety] The following phrases have been overused in this conversation. Do NOT reuse them in your next reply; choose fresh, varied wording instead: ${list}.`,
+                mes,
             };
             chat.splice(chat.length - 1, 0, note);
         }
@@ -463,6 +471,10 @@ function buildPanel() {
                 </label>
                 <label>주입 최대 개수 — <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
                 <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
+                <label>주입 문구 (템플릿)</label>
+                <p class="sk_hint"><code>{{phrases}}</code> 위치에 감지된 표현 목록이 자동으로 들어갑니다.</p>
+                <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
+                <button id="sk_injectReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
 
                 <hr>
                 <h4>반복 패널티 부스트</h4>
@@ -546,6 +558,15 @@ function bindPanel() {
 
     bindCheckbox("sk_injectEnabled", "injectEnabled");
     bindSlider("sk_maxInject", "maxInject");
+
+    const tmplEl = document.getElementById("sk_injectTemplate");
+    tmplEl.addEventListener("input", () => { s.injectTemplate = tmplEl.value; });
+    tmplEl.addEventListener("change", save);
+    document.getElementById("sk_injectReset").addEventListener("click", () => {
+        s.injectTemplate = DEFAULT_SETTINGS.injectTemplate;
+        tmplEl.value = s.injectTemplate;
+        save();
+    });
 
     bindCheckbox("sk_penaltyEnabled", "penaltyEnabled");
     bindSlider("sk_penaltyBoost", "penaltyBoost", parseFloat);
