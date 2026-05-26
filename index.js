@@ -6,6 +6,12 @@
 
 const MODULE_NAME = "slop_killer";
 
+const PASTEL_CHIPS = [
+    "#ffadad", "#ffb347", "#ffd6a5", "#fdffb6",
+    "#caffbf", "#9bf6ff", "#a0c4ff", "#bdb2ff",
+    "#ffc6ff", "#ffb3c6", "#b5ead7", "#f9c74f",
+];
+
 const DEFAULT_SETTINGS = Object.freeze({
     enabled: true,
     theme: "cream",     // system | mono | cream | peach | lilac
@@ -382,7 +388,7 @@ function buildPanel() {
     <div id="${MODULE_NAME}_panel" class="extension_settings">
         <div class="inline-drawer">
             <div class="inline-drawer-toggle inline-drawer-header">
-                <b>🚫 Slop Killer</b>
+                <b>Slop Killer</b>
                 <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
             <div class="inline-drawer-content">
@@ -393,7 +399,7 @@ function buildPanel() {
                 </label>
 
                 <hr>
-                <h4>🎨 테마</h4>
+                <h4>테마</h4>
                 <div class="sk_theme_picker">
                     <button class="sk_theme_btn" data-theme="system" title="System (기본)"></button>
                     <button class="sk_theme_btn" data-theme="mono"   title="Mono (흑백)"></button>
@@ -403,7 +409,7 @@ function buildPanel() {
                 </div>
 
                 <hr>
-                <h4>🔍 감지 설정</h4>
+                <h4>감지 설정</h4>
                 <label>구절 길이 — 최소 <span id="sk_minN_val">${s.minN}</span> 단어</label>
                 <input id="sk_minN" type="range" min="1" max="5" value="${s.minN}" class="sk_slider">
                 <label>구절 길이 — 최대 <span id="sk_maxN_val">${s.maxN}</span> 단어</label>
@@ -414,7 +420,7 @@ function buildPanel() {
                 <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
 
                 <hr>
-                <h4>💉 프롬프트 주입</h4>
+                <h4>프롬프트 주입</h4>
                 <label class="checkbox_label">
                     <input id="sk_injectEnabled" type="checkbox" ${s.injectEnabled ? "checked" : ""}>
                     <span>생성 직전 "이 표현 피하라" 자동 주입</span>
@@ -423,29 +429,36 @@ function buildPanel() {
                 <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
 
                 <hr>
-                <h4>🖍️ 하이라이트</h4>
+                <h4>하이라이트</h4>
                 <label class="checkbox_label">
                     <input id="sk_highlightEnabled" type="checkbox" ${s.highlightEnabled ? "checked" : ""}>
                     <span>반복 표현 색칠</span>
                 </label>
-                <label>색상</label>
-                <input id="sk_highlightColor" type="color" value="${s.highlightColor}">
+                <label>하이라이트 색상</label>
+                <div class="sk_color_row">
+                    <div class="sk_color_preview" id="sk_color_preview" style="background:${s.highlightColor}"></div>
+                    <input id="sk_highlightColor" type="text" class="text_pole sk_color_input"
+                           value="${s.highlightColor}" placeholder="#rrggbb" maxlength="7" spellcheck="false">
+                </div>
+                <div class="sk_color_chips">
+                    ${PASTEL_CHIPS.map(c => `<button class="sk_color_chip" data-color="${c}" style="background:${c}" title="${c}"></button>`).join("")}
+                </div>
 
                 <hr>
-                <h4>📊 현재 캐릭터: <span id="sk_charname" style="color:var(--SmartThemeQuoteColor);"></span></h4>
+                <h4>현재 캐릭터: <span id="sk_charname" style="color:var(--SmartThemeQuoteColor);"></span></h4>
                 <p class="sk_hint">감지된 반복 표현 (빈도순). 🚫 = 금지어로 추가, ✓ = 이건 슬롭 아님(제외)</p>
                 <div id="sk_ranking" class="sk_ranking"></div>
-                <button id="sk_rescan" class="menu_button" style="margin-top:6px;">🔄 다시 스캔</button>
+                <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
 
                 <hr>
-                <h4>🚫 수동 금지어</h4>
+                <h4>수동 금지어</h4>
                 <div style="display:flex; gap:6px;">
                     <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력" style="flex:1;">
                     <button id="sk_ban_add" class="menu_button">추가</button>
                 </div>
                 <div id="sk_banned_list" class="sk_chips"></div>
 
-                <h4 style="margin-top:10px;">✓ 허용어 (슬롭 아님)</h4>
+                <h4 style="margin-top:10px;">허용어 (슬롭 아님)</h4>
                 <div id="sk_allowed_list" class="sk_chips"></div>
 
             </div>
@@ -490,12 +503,39 @@ function bindPanel() {
 
     bindCheckbox("sk_highlightEnabled", "highlightEnabled", refreshAllHighlights);
 
-    const colorEl = document.getElementById("sk_highlightColor");
-    colorEl.addEventListener("input", () => {
-        s.highlightColor = colorEl.value;
+    const colorInput = document.getElementById("sk_highlightColor");
+    const colorPreview = document.getElementById("sk_color_preview");
+
+    function isHex(v) { return /^#[0-9a-fA-F]{6}$/.test(v); }
+
+    function syncColorChips(hex) {
+        document.querySelectorAll("#slop_killer_panel .sk_color_chip").forEach(btn => {
+            btn.classList.toggle("sk_color_active", btn.dataset.color.toLowerCase() === hex.toLowerCase());
+        });
+    }
+
+    colorInput.addEventListener("input", () => {
+        const val = colorInput.value.trim();
+        if (!isHex(val)) return;
+        s.highlightColor = val;
+        colorPreview.style.background = val;
+        syncColorChips(val);
         applyColor();
     });
-    colorEl.addEventListener("change", save);
+    colorInput.addEventListener("change", () => { if (isHex(colorInput.value.trim())) save(); });
+
+    document.querySelectorAll("#slop_killer_panel .sk_color_chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const hex = btn.dataset.color;
+            s.highlightColor = hex;
+            colorInput.value = hex;
+            colorPreview.style.background = hex;
+            syncColorChips(hex);
+            applyColor();
+            save();
+        });
+    });
+    syncColorChips(s.highlightColor);
 
     document.getElementById("sk_rescan").addEventListener("click", () => {
         renderPanel();

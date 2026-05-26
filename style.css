@@ -359,3 +359,77 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_chip bu
     background: var(--sk-accent);
     color: var(--sk-bg);
 }
+
+/* ====================================================================
+   Rescan button — full-width horizontal row, tighter spacing
+==================================================================== */
+.sk_rescan_btn {
+    display: block;
+    width: 100%;
+    white-space: nowrap;
+    margin-top: 6px;
+    margin-bottom: 0;
+}
+
+/* ====================================================================
+   Color picker — hex input + swatch preview + pastel chip grid
+==================================================================== */
+.sk_color_row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0 4px;
+}
+
+.sk_color_preview {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    flex-shrink: 0;
+    transition: background 150ms ease;
+}
+
+.sk_color_input {
+    flex: 1;
+    font-family: monospace;
+    font-size: 0.9em;
+    letter-spacing: 0.05em;
+    text-transform: lowercase;
+}
+
+.sk_color_chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    margin-bottom: 4px;
+}
+
+.sk_color_chip {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+    flex-shrink: 0;
+}
+
+.sk_color_chip:hover { transform: scale(1.18); }
+
+.sk_color_chip.sk_color_active {
+    border-color: rgba(0, 0, 0, 0.45);
+    transform: scale(1.12);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+/* Preview border adapts to theme */
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_color_preview {
+    border-color: var(--sk-border);
+}
+
+body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_color_chip.sk_color_active {
+    border-color: var(--sk-text);
+}
