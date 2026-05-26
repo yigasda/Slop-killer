@@ -289,8 +289,8 @@ body[data-sk-theme] #slop_killer_panel hr {
 }
 
 /* Ban / allow action icons (Font Awesome, colored) */
-.sk_ic_ban   { color: #e23b3b; }
-.sk_ic_allow { color: #2fa86e; }
+.sk_ic_ban   { color: #ec6a6a; }
+.sk_ic_allow { color: #555555; }
 
 /* ====================================================================
    Scrollable list view — banned / allowed (per-character & global)
