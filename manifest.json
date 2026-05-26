@@ -1,0 +1,14 @@
+{
+    "display_name": "Slop Killer",
+    "loading_order": 20,
+    "requires": [],
+    "optional": [],
+    "dependencies": [],
+    "js": "index.js",
+    "css": "style.css",
+    "generate_interceptor": "slopKillerInterceptor",
+    "author": "Somang",
+    "version": "1.0.0",
+    "homePage": "",
+    "auto_update": false
+}

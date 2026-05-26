@@ -1,0 +1,108 @@
+/* Slop Killer */
+
+.slop-hl {
+    background: var(--sk-hl-bg, rgba(255, 107, 107, 0.18));
+    text-decoration: underline wavy var(--sk-hl-color, #ff6b6b);
+    text-underline-offset: 2px;
+    border-radius: 2px;
+    cursor: help;
+}
+
+#slop_killer_panel h4 {
+    margin: 6px 0 4px;
+    font-size: 0.95em;
+}
+
+#slop_killer_panel .sk_hint {
+    font-size: 0.82em;
+    opacity: 0.65;
+    margin: 2px 0 6px;
+}
+
+#slop_killer_panel .sk_slider {
+    width: 100%;
+}
+
+#slop_killer_panel input[type="color"] {
+    width: 48px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.sk_ranking {
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 6px;
+}
+
+.sk_rank_row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sk_rank_count {
+    flex-shrink: 0;
+    min-width: 32px;
+    font-size: 0.8em;
+    opacity: 0.7;
+    text-align: right;
+}
+
+.sk_rank_phrase {
+    flex: 1;
+    font-size: 0.88em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sk_rank_row .menu_button {
+    padding: 1px 8px;
+    height: auto;
+    font-size: 0.85em;
+    flex-shrink: 0;
+}
+
+.sk_chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.sk_chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px 2px 8px;
+    font-size: 0.82em;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+
+.sk_chip button {
+    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    color: inherit;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    line-height: 14px;
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 0;
+}
+
+.sk_chip button:hover {
+    background: var(--sk-hl-color, #ff6b6b);
+}
