@@ -714,8 +714,8 @@ function buildPanel() {
 
     const s = getSettings();
     const html = `
-    <div id="sk_backdrop" class="sk_backdrop" style="display:none;"></div>
-    <div id="${MODULE_NAME}_panel" class="sk_window" style="display:none;">
+    <div id="sk_backdrop" class="sk_backdrop" style="display:none;">
+    <div id="${MODULE_NAME}_panel" class="sk_window">
         <div class="sk_window_header">
             <span class="sk_window_title">AI 반복 킬러</span>
             <div class="sk_window_close fa-solid fa-xmark" title="닫기"></div>
@@ -853,6 +853,7 @@ function buildPanel() {
                 </div>
 
         </div>
+    </div>
     </div>`;
 
     host.insertAdjacentHTML("beforeend", html);
@@ -1006,10 +1007,11 @@ function bindPanel() {
         });
     });
 
-    // Window chrome — close button + backdrop click closes
+    // Window chrome — close button + backdrop (outside) click closes
     const win = document.getElementById(`${MODULE_NAME}_panel`);
     win.querySelector(".sk_window_close")?.addEventListener("click", closeWindow);
-    document.getElementById("sk_backdrop")?.addEventListener("click", closeWindow);
+    const bd = document.getElementById("sk_backdrop");
+    bd?.addEventListener("click", (e) => { if (e.target === bd) closeWindow(); });
 }
 
 function renderPanel() {
@@ -1213,19 +1215,15 @@ function initChatContextMenu() {
 // Floating window — opened from the wand (magic-wand) menu
 // ====================================================================
 function openWindow() {
-    const win = document.getElementById(`${MODULE_NAME}_panel`);
-    if (!win) return;
     const bd = document.getElementById("sk_backdrop");
-    if (bd) bd.style.display = "block";
-    win.style.display = "flex";
+    if (!bd) return;
+    bd.style.display = "flex";
     renderPanel();
     const menu = document.getElementById("extensionsMenu");
     if (menu) menu.style.display = "none";
 }
 
 function closeWindow() {
-    const win = document.getElementById(`${MODULE_NAME}_panel`);
-    if (win) win.style.display = "none";
     const bd = document.getElementById("sk_backdrop");
     if (bd) bd.style.display = "none";
 }
