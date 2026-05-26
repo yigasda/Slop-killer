@@ -337,19 +337,24 @@ async function maybeReroll(rawId) {
     const spent = _rerollCount.get(mesId) || 0;
     if (spent >= s.rerollMax) return;
 
+    console.log(`[SlopKiller] 리롤 시작 — mesId:${mesId}, 감지된 금지어:${phrases.join(", ")}`);
     _rerollBusy = true;
     try {
         let cur = msg;
         for (let attempt = spent; attempt < s.rerollMax; attempt++) {
             const kept = truncateForReroll(cur.mes, phrases);
-            if (kept === null) break;                 // nothing to salvage — leave as-is
+            if (kept === null) { console.log("[SlopKiller] 보존할 문장 없음, 리롤 중단"); break; }
+            console.log(`[SlopKiller] 시도 ${attempt + 1}/${s.rerollMax} — 앞부분 보존: "${kept.slice(-40)}"`);
             cur.mes = kept;
             c.updateMessageBlock(mesId, cur);
             await c.saveChat();
             _rerollCount.set(mesId, attempt + 1);
             await c.executeSlashCommandsWithOptions("/continue");
             cur = c.chat[mesId];                       // continue may replace the object
-            if (!cur || earliestBannedPos(cur.mes, phrases) < 0) break;
+            if (!cur || earliestBannedPos(cur.mes, phrases) < 0) {
+                console.log("[SlopKiller] 리롤 성공 — 금지어 없음");
+                break;
+            }
         }
     } catch (err) {
         console.error("[SlopKiller] auto-reroll error:", err);
@@ -357,6 +362,27 @@ async function maybeReroll(rawId) {
         _rerollBusy = false;
         refreshAllHighlights();
     }
+}
+
+// Debug helper — injects a banned phrase into the last AI message and triggers reroll.
+async function debugTestReroll() {
+    const c = ctx();
+    const chat = c.chat || [];
+    const phrases = getCharData(getCurrentCharName()).banned;
+    if (!phrases.length) { alert("금지어가 없습니다. 먼저 금지어를 등록하세요."); return; }
+    let mesId = -1;
+    for (let i = chat.length - 1; i >= 0; i--) {
+        if (!chat[i].is_user && !chat[i].is_system) { mesId = i; break; }
+    }
+    if (mesId < 0) { alert("AI 메시지가 없습니다."); return; }
+    if (mesId !== chat.length - 1) { alert("마지막 메시지가 AI 메시지여야 합니다.\n(지금은 유저 메시지가 마지막입니다.)"); return; }
+    const inject = phrases[0];
+    const msg = chat[mesId];
+    msg.mes = msg.mes.trimEnd() + " " + inject;
+    c.updateMessageBlock(mesId, msg);
+    await c.saveChat();
+    console.log(`[SlopKiller] 테스트 주입 완료 — mesId:${mesId}, 주입어:"${inject}". 리롤 시작...`);
+    setTimeout(() => maybeReroll(mesId), 0);
 }
 
 // ====================================================================
@@ -619,6 +645,8 @@ function buildPanel() {
                 <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기(continue)로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
                 <label>최대 재시도 — <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
                 <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
+                <button id="sk_test_reroll" class="menu_button sk_reset_btn">리롤 테스트</button>
+                <p class="sk_hint">등록된 금지어를 마지막 AI 메시지에 주입해 자동 리롤 동작을 즉시 확인합니다. 콘솔(F12)에 진행 로그가 출력됩니다.</p>
 
                 <hr>
                 <h4>하이라이트</h4>
@@ -708,6 +736,7 @@ function bindPanel() {
 
     bindCheckbox("sk_autoReroll", "autoReroll");
     bindSlider("sk_rerollMax", "rerollMax");
+    document.getElementById("sk_test_reroll").addEventListener("click", debugTestReroll);
 
     bindCheckbox("sk_highlightEnabled", "highlightEnabled", refreshAllHighlights);
 
