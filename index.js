@@ -39,9 +39,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     characters: {},     // charName -> { banned: [], allowed: [] }
     global: { banned: [], allowed: [] },   // applied across every character
     activeTab: "banned",                   // remembered between sessions
-    koreanMode: true,                      // KO stopwords + 조사/어미 변형 묶기
     customStopwords: "",                   // user stopwords (comma/newline separated)
-    detectPresets: {},                     // name -> { minN, maxN, threshold, scanDepth, koreanMode, customStopwords }
+    detectPresets: {},                     // name -> { minN, maxN, threshold, scanDepth, customStopwords }
 });
 
 // Backends that support freq_pen_openai / pres_pen_openai in oai_settings.
@@ -202,11 +201,11 @@ function stripKoSuffix(w) {
     return w;
 }
 
-// Effective stopword set = English ∪ (Korean if enabled) ∪ custom.
+// Effective stopword set = English ∪ Korean ∪ custom.
 function effectiveStopwords() {
     const s = getSettings();
     const set = new Set(STOPWORDS);
-    if (s.koreanMode) for (const w of KO_STOPWORDS) set.add(w);
+    for (const w of KO_STOPWORDS) set.add(w);
     if (s.customStopwords) {
         for (const w of String(s.customStopwords).split(/[\s,]+/)) {
             const k = w.trim().toLowerCase();
@@ -222,7 +221,6 @@ function effectiveStopwords() {
 function computeCounts() {
     const s = getSettings();
     const stop = effectiveStopwords();
-    const ko = !!s.koreanMode;
     const chat = ctx().chat || [];
     const msgs = chat.filter(m =>
         m && !m.is_user && !m.is_system && typeof m.mes === "string" && m.mes.trim()
@@ -231,7 +229,7 @@ function computeCounts() {
     const agg = new Map();   // normKey -> { count, surfaces: Map<surface, count> }
     for (const m of msgs) {
         const surf = tokenize(m.mes);
-        const norm = ko ? surf.map(stripKoSuffix) : surf;
+        const norm = surf.map(stripKoSuffix);
         for (let n = s.minN; n <= s.maxN; n++) {
             for (let i = 0; i + n <= surf.length; i++) {
                 const normGram = norm.slice(i, i + n);
@@ -533,9 +531,29 @@ globalThis.slopKillerInterceptor = async function (chat, _contextSize, _abort, t
 // ====================================================================
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
+// Korean particle/ending alternation — pre-compiled for buildPhraseRegex.
+const KO_SUFFIX_ALT = KO_SUFFIXES.map(escapeRe).join("|");
+
+// Wrap a single phrase into a regex pattern that tolerates Korean inflection:
+// any pure-Hangul token is matched as `stem(?:KO_SUFFIX)?`, so a banned
+// "그녀는 미소지었다" also catches "그녀가 미소지으며", "그녀 미소지", etc.
+// Non-Hangul tokens are escaped literally (English behavior unchanged).
+function expandPhraseForKo(phrase) {
+    return phrase.trim().split(/\s+/).map(tok => {
+        if (!isHangulToken(tok)) return escapeRe(tok);
+        const stem = stripKoSuffix(tok);
+        return escapeRe(stem) + `(?:${KO_SUFFIX_ALT})?`;
+    }).join("\\s+");
+}
+
 function buildPhraseRegex(phrases) {
     if (!phrases.length) return null;
-    const alts = [...phrases].sort((a, b) => b.length - a.length).map(escapeRe).join("|");
+    const alts = [...phrases]
+        .sort((a, b) => b.length - a.length)
+        .map(expandPhraseForKo)
+        .filter(Boolean)
+        .join("|");
+    if (!alts) return null;
     return new RegExp(`(${alts})`, "gi");
 }
 
@@ -864,14 +882,6 @@ function buildPanel() {
                     <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
 
                     <hr>
-                    <h4><i class="fa-solid fa-language sk_h4_icon"></i>한국어</h4>
-                    <label class="checkbox_label">
-                        <input id="sk_koreanMode" type="checkbox" ${s.koreanMode ? "checked" : ""}>
-                        <span>한국어 처리 (조사·어미 변형 묶기 + 한국어 불용어)</span>
-                    </label>
-                    <p class="sk_hint">"그녀는 / 그녀가"처럼 조사·어미만 다른 표현을 같은 표현으로 묶어 감지합니다. 한국어 RP에 권장합니다.</p>
-
-                    <hr>
                     <h4><i class="fa-solid fa-filter sk_h4_icon"></i>불용어</h4>
                     <label>커스텀 불용어 — 감지에서 무시할 단어 (쉼표·줄바꿈 구분)</label>
                     <textarea id="sk_customStopwords" class="text_pole sk_template" rows="2" spellcheck="false">${escapeHtml(s.customStopwords)}</textarea>
@@ -879,7 +889,7 @@ function buildPanel() {
 
                     <hr>
                     <h4><i class="fa-solid fa-bookmark sk_h4_icon"></i>프리셋</h4>
-                    <p class="sk_hint">현재 감지 슬라이더 + 한국어 + 불용어 설정을 묶음으로 저장합니다.</p>
+                    <p class="sk_hint">현재 감지 슬라이더 + 불용어 설정을 묶음으로 저장합니다.</p>
                     <div class="sk_preset_row">
                         <select id="sk_preset_select" class="text_pole"></select>
                         <button id="sk_preset_load" class="menu_button" title="선택한 프리셋 적용">불러오기</button>
@@ -1005,7 +1015,6 @@ function bindPanel() {
     bindSlider("sk_threshold", "threshold", parseInt, () => { renderPanel(); refreshAllHighlights(); });
     bindSlider("sk_scanDepth", "scanDepth", parseInt, () => { renderPanel(); refreshAllHighlights(); });
 
-    bindCheckbox("sk_koreanMode", "koreanMode", () => { renderPanel(); refreshAllHighlights(); });
     const csEl = document.getElementById("sk_customStopwords");
     if (csEl) {
         csEl.addEventListener("input", () => { s.customStopwords = csEl.value; });
@@ -1034,23 +1043,18 @@ function bindPanel() {
     }
 
     function applyPresetValues(p) {
-        // Settings
-        if (typeof p.minN       === "number") s.minN       = p.minN;
-        if (typeof p.maxN       === "number") s.maxN       = p.maxN;
-        if (typeof p.threshold  === "number") s.threshold  = p.threshold;
-        if (typeof p.scanDepth  === "number") s.scanDepth  = p.scanDepth;
-        if (typeof p.koreanMode === "boolean") s.koreanMode = p.koreanMode;
+        if (typeof p.minN      === "number") s.minN      = p.minN;
+        if (typeof p.maxN      === "number") s.maxN      = p.maxN;
+        if (typeof p.threshold === "number") s.threshold = p.threshold;
+        if (typeof p.scanDepth === "number") s.scanDepth = p.scanDepth;
         if (typeof p.customStopwords === "string") s.customStopwords = p.customStopwords;
 
-        // Sliders + their _val labels
         for (const k of ["minN", "maxN", "threshold", "scanDepth"]) {
             const el  = document.getElementById(`sk_${k}`);
             const lbl = document.getElementById(`sk_${k}_val`);
             if (el)  el.value = s[k];
             if (lbl) lbl.textContent = String(s[k]);
         }
-        const kEl = document.getElementById("sk_koreanMode");
-        if (kEl) kEl.checked = !!s.koreanMode;
         if (csEl) csEl.value = s.customStopwords || "";
     }
 
@@ -1059,7 +1063,7 @@ function bindPanel() {
         if (!name) { toastr?.warning?.("프리셋 이름을 입력하세요"); return; }
         s.detectPresets[name] = {
             minN: s.minN, maxN: s.maxN, threshold: s.threshold, scanDepth: s.scanDepth,
-            koreanMode: !!s.koreanMode, customStopwords: s.customStopwords || "",
+            customStopwords: s.customStopwords || "",
         };
         save();
         renderPresetSelect(name);
