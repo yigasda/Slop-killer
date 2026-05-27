@@ -1978,6 +1978,31 @@ function initChatContextMenu() {
         if (phrase) showCtxMenu(e.clientX, e.clientY, phrase);
     });
 
+    // 드래그/터치 선택 후 손·마우스 뗐을 때 → 팝업
+    function onPointerUp(e) {
+        // 터치는 selection 확정이 약간 늦을 수 있어서 50ms 지연
+        const delay = e.type === "touchend" ? 50 : 0;
+        setTimeout(() => {
+            const sel = window.getSelection();
+            const text = sel?.toString().trim().replace(/\s+/g, " ") ?? "";
+            if (!text || text.length > 120) return;
+            const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+            if (!range) return;
+            const node = range.commonAncestorContainer;
+            const mes = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)
+                ?.closest?.(".mes");
+            if (!mes || mes.getAttribute("is_user") === "true") return;
+            const rect = range.getBoundingClientRect();
+            showCtxMenu(
+                Math.round((rect.left + rect.right) / 2),
+                Math.round(rect.bottom),
+                text
+            );
+        }, delay);
+    }
+    chat.addEventListener("mouseup", onPointerUp);
+    chat.addEventListener("touchend", onPointerUp, { passive: true });
+
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideCtxMenu(); });
 }
 
