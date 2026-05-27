@@ -557,10 +557,12 @@ async function rerollSurgically(c, mesId, phrases) {
     const after = text.slice(end);
     if (!target.trim()) return false;
 
+    console.log(`[SlopKiller] 교체 대상 문장: "${target.trim().slice(0, 80)}..."`);
     const prompt = buildRewritePrompt(before, target, after, phrases);
     let raw = "";
     try {
         const quiet = c.generateQuietPrompt ?? globalThis.generateQuietPrompt;
+        console.log(`[SlopKiller] generateQuietPrompt 유형: ${typeof quiet}`);
         if (typeof quiet === "function") {
             // generateQuietPrompt(quietPrompt, quietToLoud=false, skipWIAN=false, ...)
             raw = await quiet(prompt, false, false);
@@ -606,7 +608,9 @@ async function maybeReroll(rawId) {
     const mesId = Number(rawId);
     const c = ctx();
     const chat = c.chat || [];
-    if (mesId !== chat.length - 1) return;            // only the freshest message
+    // NOTE: no position check here — surgical reroll uses generateQuietPrompt
+    // which is independent of message position. QR2/other extensions may add
+    // messages after ours, so checking chat.length-1 would always bail out.
     const msg = chat[mesId];
     if (!msg || msg.is_user || msg.is_system) return;
 
@@ -617,14 +621,20 @@ async function maybeReroll(rawId) {
     const spent = _rerollCount.get(mesId) || 0;
     if (spent >= s.rerollMax) return;
 
+    console.log(`[SlopKiller] 자동 리롤 시작: mesId=${mesId}, 시도=${spent + 1}/${s.rerollMax}`);
     _rerollBusy = true;
     try {
         for (let attempt = spent; attempt < s.rerollMax; attempt++) {
             _rerollCount.set(mesId, attempt + 1);
+            console.log(`[SlopKiller] rerollSurgically 호출 중... (attempt ${attempt + 1})`);
             const ok = await rerollSurgically(c, mesId, phrases);
+            console.log(`[SlopKiller] rerollSurgically 결과: ok=${ok}`);
             if (!ok) break;
             const cur = c.chat[mesId];
-            if (!cur || earliestBannedPos(cur.mes, phrases) < 0) break;
+            if (!cur || earliestBannedPos(cur.mes, phrases) < 0) {
+                console.log("[SlopKiller] 금지 표현 제거 완료");
+                break;
+            }
         }
     } catch (err) {
         console.error("[SlopKiller] auto-reroll error:", err);
