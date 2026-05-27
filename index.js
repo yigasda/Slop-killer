@@ -1883,10 +1883,9 @@ function renderChipBox(id, list, kind, scope, filter) {
 }
 
 // ====================================================================
-// Chat context-menu — right-click or long-press on AI messages
+// Chat context-menu — right-click (PC) or tap on highlight (mobile)
 // ====================================================================
 let _ctxMenu = null;
-let _longPressTimer = null;
 
 function wordAtCaret(range) {
     const node = range.startContainer;
@@ -1960,6 +1959,7 @@ function initChatContextMenu() {
     const chat = document.getElementById("chat");
     if (!chat) return;
 
+    // PC: 우클릭 — 기존과 동일
     chat.addEventListener("contextmenu", (e) => {
         const mes = e.target.closest(".mes");
         if (!mes || mes.getAttribute("is_user") === "true") return;
@@ -1968,21 +1968,15 @@ function initChatContextMenu() {
         if (phrase) showCtxMenu(e.clientX, e.clientY, phrase);
     });
 
-    chat.addEventListener("touchstart", (e) => {
-        const mes = e.target.closest(".mes");
+    // 모바일/PC 공통: 하이라이트 span 탭/클릭 → 팝업
+    chat.addEventListener("click", (e) => {
+        const hl = e.target.closest(".slop-hl");
+        if (!hl) return;
+        const mes = hl.closest(".mes");
         if (!mes || mes.getAttribute("is_user") === "true") return;
-        const touch = e.touches[0];
-        const target = e.target;
-        _longPressTimer = setTimeout(() => {
-            const phrase = phraseFromEvent(target, touch.clientX, touch.clientY);
-            if (phrase) { navigator.vibrate?.(40); showCtxMenu(touch.clientX, touch.clientY, phrase); }
-        }, 500);
-    }, { passive: true });
-
-    const cancelLp = () => clearTimeout(_longPressTimer);
-    chat.addEventListener("touchmove",   cancelLp, { passive: true });
-    chat.addEventListener("touchend",    cancelLp, { passive: true });
-    chat.addEventListener("touchcancel", cancelLp, { passive: true });
+        const phrase = hl.textContent.trim();
+        if (phrase) showCtxMenu(e.clientX, e.clientY, phrase);
+    });
 
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideCtxMenu(); });
 }
