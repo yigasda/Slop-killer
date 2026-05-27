@@ -1195,6 +1195,7 @@ function buildPanel() {
                     <hr>
                     <h4><i class="fa-solid fa-ban sk_h4_icon"></i>등록된 금지어</h4>
                     <p class="sk_hint">위 목록에서 <i class="fa-solid fa-ban sk_ic_ban"></i>를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
+                    <p class="sk_hint">💡 한국어는 조사·어미가 달라도 자동으로 같이 차단됩니다. <b>메인 텍스트(어간)만</b> 등록하면 됩니다 — 예: <code>허리</code> 하나로 허리를·허리에·허리가 모두 차단. 표현이 짧게 잘려 보이는 것이 정상입니다.</p>
                     <div class="sk_ban_row">
                         <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
                         <button id="sk_ban_add" class="menu_button">추가</button>
@@ -1245,7 +1246,7 @@ function buildPanel() {
 
                     <hr>
                     <h4><i class="fa-solid fa-filter sk_h4_icon"></i>불용어</h4>
-                    <label>커스텀 불용어 — 감지에서 무시할 단어 (쉼표·줄바꿈 구분)</label>
+                    <label>감지에서 무시할 단어 (쉼표·줄바꿈 구분)</label>
                     <textarea id="sk_customStopwords" class="text_pole sk_template" rows="2" spellcheck="false">${escapeHtml(s.customStopwords)}</textarea>
                     <p class="sk_hint">캐릭터 이름이나 자주 쓰는 호칭을 넣으면 반복 후보에서 빠집니다.</p>
 
@@ -1297,7 +1298,7 @@ function buildPanel() {
                     <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
 
                     <hr>
-                    <h4><i class="fa-solid fa-arrows-rotate sk_h4_icon"></i>자동 리롤</h4>
+                    <h4><i class="fa-solid fa-arrows-rotate sk_h4_icon"></i>중복 표현 자동 리롤</h4>
                     <label class="checkbox_label">
                         <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
                         <span>등록한 금지어가 답변에 나오면 자동으로 다시 생성합니다</span>
