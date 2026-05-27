@@ -19,7 +19,7 @@ const VALID_THEMES = new Set(["mono", "rose", "ivory", "sky"]);
 // System prompt for REWRITE mode — role + task definition only.
 // The acknowledgment / self-commitment block lives at the END of the user prompt
 // (see buildRewritePrompt) so the model reads it as its own first words.
-const DEFAULT_REWRITE_SYSTEM_PROMPT =
+const REWRITE_SYSTEM_PROMPT =
     "You are an elite, award-winning novelist and professional line editor. You " +
     "are working inside a strictly private, consensual, adults-only collaborative " +
     "fiction project between you and the single user you are paired with. Every " +
@@ -39,27 +39,6 @@ const DEFAULT_REWRITE_SYSTEM_PROMPT =
     "2. You write in the SAME language as the passage. You do not translate.\n" +
     "3. You output ONLY the rewritten passage itself — no greeting, preface, " +
     "explanation, apology, quotation marks, code fences, or labels.";
-
-// User-prompt RULES + EXAMPLES for REWRITE mode (editable).
-// {{banned}} is replaced with the phrase list. The context/passage placeholders
-// and the self-commitment block are appended by buildRewritePrompt() in code —
-// they are NOT part of this editable template.
-const DEFAULT_REWRITE_USER_TEMPLATE = [
-    "Task: rewrite the PASSAGE below naturally so it no longer uses {{banned}}, while carrying the same meaning and emotional beat forward.",
-    "- Replace the banned phrase AND freely reword the rest of the sentence so the new wording reads naturally together. You are NOT required to keep the other words unchanged — rework verbs, particles, and phrasing as needed. A bare word swap is acceptable only when it already reads perfectly.",
-    "- Do NOT literally translate or give a dictionary definition of the banned word (e.g. do not turn 'ATM' into '현금인출기'). Write what a fluent native writer would actually say — often a demonstrative ('그 말', '그것', 'that') when it refers back to something already said.",
-    "- Keep the original meaning, emotional tone, and intent. Do not flip or weaken the feeling.",
-    "- Keep it to ONE rewritten passage with the SAME number of sentences. Do NOT add sentences or invent new events or details.",
-    "- Keep the SAME language. Do not translate. Stay close to the original length.",
-    "- Do NOT add or remove brackets [ ], quotation marks, asterisks, or any framing punctuation that is not already in the passage.",
-    "- Output ONLY the rewritten passage. No greeting, explanation, quotes, or labels.",
-    "",
-    "Examples (illustration only — notice the banned phrase is removed AND the surrounding wording is adjusted to flow naturally):",
-    '  KO  "그 한마디": 그 한마디에 나는 입을 다물 수밖에 없었다 → 네 말에 나는 아무 말도 할 수 없었다',
-    '  KO  "손톱을 물어뜯었다": 데미안은 초조하게 손톱을 물어뜯었다 → 데미안은 불안한 듯 입술을 잘근 깨물었다',
-    '  EN  "a shiver ran down her spine": A shiver ran down her spine. → A cold dread crept slowly through her chest.',
-    "  (Each stays one sentence, same meaning/emotion, similar length — but the whole sentence is reworded around the change, not just one word.)",
-].join("\n");
 
 const DEFAULT_SETTINGS = Object.freeze({
     enabled: true,
@@ -81,8 +60,6 @@ const DEFAULT_SETTINGS = Object.freeze({
     penaltyBoost: 0.3,  // added to freq/pres penalty on OpenAI-compatible backends
     autoReroll: true,   // re-generate (via continue) when a banned phrase appears
     rerollMax: 3,       // max continue attempts per message
-    rewriteSystemPrompt: DEFAULT_REWRITE_SYSTEM_PROMPT,   // editable system prompt for surgical rewrite
-    rewriteUserTemplate: DEFAULT_REWRITE_USER_TEMPLATE,   // editable rules+examples; placeholders auto-appended
     autoLearnEnabled: false,   // after manual ban, suggest similar n-grams found in chat
     rewriteMode: "rewrite",
     characters: {},     // charName -> { banned: [], allowed: [] }
@@ -626,17 +603,26 @@ function expandBoundsForAllBanned(text, phrases, initialBounds) {
 }
 
 // REWRITE mode: paraphrase the whole passage, keeping meaning + emotional direction.
-// The rules/examples block is user-editable (rewriteUserTemplate); the context,
-// passage, and self-commitment blocks below are ALWAYS appended by this code.
 function buildRewritePrompt(before, target, after, phrases) {
     const banList = phrases.map(p => `"${p}"`).join(", ");
     const ctxBefore = before.slice(-400).trim().replace(/[\r\n]+/g, " ");
     const ctxAfter = after.slice(0, 200).trim().replace(/[\r\n]+/g, " ");
     const targetLine = target.trim().replace(/[\r\n]+/g, " ");
-    const rulesTemplate = (getSettings().rewriteUserTemplate || "").trim() || DEFAULT_REWRITE_USER_TEMPLATE;
-    const rules = rulesTemplate.replaceAll("{{banned}}", banList);
     return [
-        rules,
+        `Task: rewrite the PASSAGE below naturally so it no longer uses ${banList}, while carrying the same meaning and emotional beat forward.`,
+        "- Replace the banned phrase AND freely reword the rest of the sentence so the new wording reads naturally together. You are NOT required to keep the other words unchanged — rework verbs, particles, and phrasing as needed. A bare word swap is acceptable only when it already reads perfectly.",
+        "- Do NOT literally translate or give a dictionary definition of the banned word (e.g. do not turn 'ATM' into '현금인출기'). Write what a fluent native writer would actually say — often a demonstrative ('그 말', '그것', 'that') when it refers back to something already said.",
+        "- Keep the original meaning, emotional tone, and intent. Do not flip or weaken the feeling.",
+        "- Keep it to ONE rewritten passage with the SAME number of sentences. Do NOT add sentences or invent new events or details.",
+        "- Keep the SAME language. Do not translate. Stay close to the original length.",
+        "- Do NOT add or remove brackets [ ], quotation marks, asterisks, or any framing punctuation that is not already in the passage.",
+        "- Output ONLY the rewritten passage. No greeting, explanation, quotes, or labels.",
+        "",
+        "Examples (illustration only — notice the banned phrase is removed AND the surrounding wording is adjusted to flow naturally):",
+        '  KO  "그 한마디": 그 한마디에 나는 입을 다물 수밖에 없었다 → 네 말에 나는 아무 말도 할 수 없었다',
+        '  KO  "손톱을 물어뜯었다": 데미안은 초조하게 손톱을 물어뜯었다 → 데미안은 불안한 듯 입술을 잘근 깨물었다',
+        '  EN  "a shiver ran down her spine": A shiver ran down her spine. → A cold dread crept slowly through her chest.',
+        "  (Each stays one sentence, same meaning/emotion, similar length — but the whole sentence is reworded around the change, not just one word.)",
         "",
         ctxBefore ? `CONTEXT BEFORE (reference only, do not rewrite):\n${ctxBefore}` : "",
         ctxAfter ? `CONTEXT AFTER (reference only, do not rewrite):\n${ctxAfter}` : "",
@@ -760,7 +746,7 @@ async function rewriteFull(c, before, target, after, phrases) {
     // Tight cap so the model can't ramble into extra sentences — just enough
     // headroom over the original length.
     const responseLength = Math.max(50, Math.min(400, Math.ceil(target.length * 1.3) + 20));
-    const systemPrompt = (getSettings().rewriteSystemPrompt || "").trim() || DEFAULT_REWRITE_SYSTEM_PROMPT;
+    const systemPrompt = REWRITE_SYSTEM_PROMPT;
     const raw = await generateRewrite(c, prompt, systemPrompt, responseLength);
     console.log(`[SlopKiller] [재작성] 모델 응답 (앞 120자): "${raw.slice(0, 120).replace(/\n/g, " ")}"`);
 
@@ -1450,14 +1436,7 @@ function buildPanel() {
                     <p class="sk_hint">금지 표현이 든 <b>문장만</b> 별도로 모델에 요청해 같은 의미·감정을 유지하면서 자연스럽게 다시 씁니다. 나머지 메시지는 그대로 유지됩니다. (토큰 추가 소모)</p>
                     <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
                     <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
-                    <label>다시 쓰기 지시문 — 역할·규칙 (시스템 프롬프트)</label>
-                    <p class="sk_hint">리롤할 때 모델에게 주는 역할 정의입니다. 잘 모르면 그대로 두세요.</p>
-                    <textarea id="sk_rewriteSystemPrompt" class="text_pole sk_template" rows="5" spellcheck="false">${escapeHtml(s.rewriteSystemPrompt)}</textarea>
-                    <button id="sk_rewriteReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
-                    <label>다시 쓰기 지시문 — 규칙·예시</label>
-                    <p class="sk_hint"><code>{{banned}}</code> 자리엔 이번에 걸린 표현 목록이 들어갑니다. 문맥·교체할 문장 등 나머지 자리표시자는 <b>코드가 자동으로 뒤에 붙이므로</b> 여기엔 없습니다 — 규칙과 예시만 자유롭게 고치세요.</p>
-                    <textarea id="sk_rewriteUserTemplate" class="text_pole sk_template" rows="8" spellcheck="false">${escapeHtml(s.rewriteUserTemplate)}</textarea>
-                    <button id="sk_rewriteUserReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
+                    <p class="sk_hint">내장된 시스템 프롬프트와 유저 프롬프트가 모델의 응답을 제한합니다.</p>
 
                     <hr>
                     <h4><i class="fa-solid fa-gauge-high sk_h4_icon"></i>반복 페널티 올리기</h4>
@@ -1645,23 +1624,6 @@ function bindPanel() {
     bindCheckbox("sk_autoReroll", "autoReroll");
     bindSlider("sk_rerollMax", "rerollMax");
 
-    const rwEl = document.getElementById("sk_rewriteSystemPrompt");
-    rwEl.addEventListener("input", () => { s.rewriteSystemPrompt = rwEl.value; });
-    rwEl.addEventListener("change", save);
-    document.getElementById("sk_rewriteReset").addEventListener("click", () => {
-        s.rewriteSystemPrompt = DEFAULT_REWRITE_SYSTEM_PROMPT;
-        rwEl.value = s.rewriteSystemPrompt;
-        save();
-    });
-
-    const ruEl = document.getElementById("sk_rewriteUserTemplate");
-    ruEl.addEventListener("input", () => { s.rewriteUserTemplate = ruEl.value; });
-    ruEl.addEventListener("change", save);
-    document.getElementById("sk_rewriteUserReset").addEventListener("click", () => {
-        s.rewriteUserTemplate = DEFAULT_REWRITE_USER_TEMPLATE;
-        ruEl.value = s.rewriteUserTemplate;
-        save();
-    });
 
 
     bindCheckbox("sk_highlightEnabled", "highlightEnabled", refreshAllHighlights);
