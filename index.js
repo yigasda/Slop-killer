@@ -568,20 +568,20 @@ function buildRewritePrompt(before, target, after, phrases) {
     const ctxAfter = after.slice(0, 200).trim().replace(/[\r\n]+/g, " ");
     const targetLine = target.trim().replace(/[\r\n]+/g, " ");
     return [
-        `Task: re-express the PASSAGE below so it does NOT contain ${banList}, while carrying the same meaning and emotional beat forward.`,
-        "- Express the same idea freshly and naturally. If a simple synonym swap reads well, use it; if not, rephrase the whole clause or sentence — you are not limited to swapping single words.",
+        `Task: rewrite the PASSAGE below naturally so it no longer uses ${banList}, while carrying the same meaning and emotional beat forward.`,
+        "- Replace the banned phrase AND freely reword the rest of the sentence so the new wording reads naturally together. You are NOT required to keep the other words unchanged — rework verbs, particles, and phrasing as needed. A bare word swap is acceptable only when it already reads perfectly.",
+        "- Do NOT literally translate or give a dictionary definition of the banned word (e.g. do not turn 'ATM' into '현금인출기'). Write what a fluent native writer would actually say — often a demonstrative ('그 말', '그것', 'that') when it refers back to something already said.",
         "- Keep the original meaning, emotional tone, and intent. Do not flip or weaken the feeling.",
-        "- Keep the SAME number of sentences. Do NOT add or remove sentences, and do NOT invent new events or details.",
+        "- Keep it to ONE rewritten passage with the SAME number of sentences. Do NOT add sentences or invent new events or details.",
         "- Keep the SAME language. Do not translate. Stay close to the original length.",
         "- Do NOT add or remove brackets [ ], quotation marks, asterisks, or any framing punctuation that is not already in the passage.",
         "- Output ONLY the rewritten passage. No greeting, explanation, quotes, or labels.",
         "",
-        "Examples (illustration only — rewrite in whatever language the passage is in):",
-        '  KO  "팔을 깨물었다": OO은 팔을 깨물었다 → OO은 입술을 짓씹었다  (same anxious gesture, expressed differently)',
-        '  KO  "낡은 가방": 낡은 가방을 만지작거렸다 → 낡은 물건을 만지작거렸다  (a natural synonym swap is enough)',
-        '  EN  "a shiver ran down her spine": A shiver ran down her spine → A cold prickle crept across her shoulders  (same chill, reworded)',
-        '  EN  "the old satchel": He fiddled with the old satchel → He fiddled with the worn bag  (a simple synonym swap)',
-        "  (Each keeps the same sentence count, meaning, emotion, and length — only the repeated expression is renewed.)",
+        "Examples (illustration only — notice the banned phrase is removed AND the surrounding wording is adjusted to flow naturally):",
+        '  KO  "ATM 비유": ATM 비유 듣고 나서야 내가 무슨 짓을 했는지 알겠다 → 그 비유를 들으니까 내가 너에게 어떤 짓을 했는지 이해했어',
+        '  KO  "팔을 깨물었다": 도윤은 초조하게 팔을 깨물었다 → 도윤은 불안한 듯 입술을 잘근 깨물었다',
+        '  EN  "a shiver ran down her spine": A shiver ran down her spine. → A cold dread crept slowly through her chest.',
+        "  (Each stays one sentence, same meaning/emotion, similar length — but the whole sentence is reworded around the change, not just one word.)",
         "",
         ctxBefore ? `CONTEXT BEFORE (reference only, do not rewrite):\n${ctxBefore}` : "",
         ctxAfter ? `CONTEXT AFTER (reference only, do not rewrite):\n${ctxAfter}` : "",
@@ -753,6 +753,12 @@ async function rewriteFull(c, before, target, after, phrases) {
     if (replacement.replace(/\s+/g, " ") === target.trim().replace(/\s+/g, " ")) { console.warn("[SlopKiller] 모델이 원문 그대로 반환함 — 폐기"); return null; }
     // Reject if much longer than the original — means the model invented extra content.
     if (replacement.length > target.length * 2 + 60) { console.warn(`[SlopKiller] 응답이 원본보다 너무 김 (원본 ${target.length}자, 응답 ${replacement.length}자) — 폐기`); return null; }
+    // Reject if far SHORTER than the original — a truncated/fragment response
+    // (e.g. Gemini returning "현금 인") must not replace a whole sentence.
+    if (target.trim().length >= 12 && replacement.length < target.trim().length * 0.5) {
+        console.warn(`[SlopKiller] 응답이 원본보다 너무 짧음 (원본 ${target.trim().length}자, 응답 ${replacement.length}자) — 잘린 응답으로 보고 폐기`);
+        return null;
+    }
     // Reject if the sentence count jumped — model added sentences.
     const cntTarget = (targetOneLine.match(/\.{2,}|[.!?。！？]/g) || []).length;
     const cntRep = (replacement.match(/\.{2,}|[.!?。！？]/g) || []).length;
