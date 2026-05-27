@@ -521,24 +521,19 @@ function expandBoundsForAllBanned(text, phrases, initialBounds) {
 }
 
 function buildRewritePrompt(before, target, after, phrases) {
-    const ctxBefore = before.slice(-300).trim().replace(/[\r\n]+/g, " ");
     const banList = phrases.map(p => `"${p}"`).join(", ");
     const targetLine = target.trim().replace(/[\r\n]+/g, " ");
-    // Short, direct English prompt. Long multi-section Korean prompts get
-    // misread as RP speech by many models (esp. Gemini) — they reply with
-    // greetings instead of editing. English with explicit "Output ONLY" works.
+    // No surrounding context — surrounding RP text often trips safety filters
+    // (Vertex returns "Candidate text empty"). Single-sentence rewrite is
+    // usually enough context for the model.
     return [
-        "You are a text editor, not a chatbot or roleplay character.",
-        `Task: rewrite the PASSAGE below so it does NOT contain ${banList}.`,
-        "Rules:",
-        "- Keep the same language as the passage (do NOT translate).",
-        "- Keep the same tone, style, and approximate length.",
-        "- Preserve the meaning; replace the banned phrase with a natural synonym or rephrasing.",
-        "- Output ONLY the rewritten passage. No greeting, no explanation, no quotes, no labels.",
+        "You are a text rewriter for a creative writing project.",
+        `Task: rewrite the sentence so it does NOT contain ${banList}.`,
+        "Keep the same language. Keep the same tone, style, and approximate length.",
+        "Output ONLY the rewritten sentence. No greeting, explanation, quotes, or labels.",
         "",
-        ctxBefore ? `CONTEXT (do not rewrite, for reference only):\n${ctxBefore}\n` : "",
-        `PASSAGE TO REWRITE:\n${targetLine}`,
-    ].filter(Boolean).join("\n");
+        `Sentence: ${targetLine}`,
+    ].join("\n");
 }
 
 // Heuristic: did the model bail out and produce a generic greeting / refusal
@@ -579,19 +574,43 @@ async function rerollSurgically(c, mesId, phrases) {
     const responseLength = Math.max(120, Math.min(800, Math.ceil(target.length * 2)));
 
     let raw = "";
-    try {
-        const quiet = c.generateQuietPrompt ?? globalThis.generateQuietPrompt;
-        console.log(`[SlopKiller] generateQuietPrompt 유형: ${typeof quiet}, responseLength=${responseLength}`);
-        if (typeof quiet !== "function") {
-            console.error("[SlopKiller] generateQuietPrompt 없음");
-            return false;
+    // Try generateRaw FIRST — it sends only the system+prompt without chat history,
+    // which is critical: chat history may contain NSFW or images that trip Vertex
+    // safety filters and force an empty response.
+    const genRaw = c.generateRaw ?? globalThis.generateRaw;
+    const genQuiet = c.generateQuietPrompt ?? globalThis.generateQuietPrompt;
+    console.log(`[SlopKiller] generateRaw=${typeof genRaw}, generateQuietPrompt=${typeof genQuiet}, responseLength=${responseLength}`);
+
+    if (typeof genRaw === "function") {
+        try {
+            // Signature varies across ST versions; the modern one is:
+            // generateRaw({ prompt, systemPrompt, responseLength, ... })
+            // Older one: generateRaw(prompt, api, instructOverride, quietToLoud, systemPrompt, responseLength)
+            const out = await genRaw({
+                prompt: prompt,
+                systemPrompt: "You are a text editor. Output only the requested rewrite.",
+                responseLength: responseLength,
+                jsonSchema: null,
+            }).catch(async (e) => {
+                // Argument-object form failed — try positional form.
+                console.warn("[SlopKiller] generateRaw object-form 실패, positional 시도:", e?.message ?? e);
+                return await genRaw(prompt, null, false, false,
+                    "You are a text editor. Output only the requested rewrite.",
+                    responseLength);
+            });
+            raw = String(out ?? "");
+        } catch (err) {
+            console.warn("[SlopKiller] generateRaw 실패, generateQuietPrompt로 폴백:", err?.message ?? err);
         }
-        // (quietPrompt, quietToLoud=false, skipWIAN=true, quietImage=null, quietName, responseLength)
-        // skipWIAN=true so WI/character cards/author's note don't leak in and pull the model into RP mode.
-        raw = await quiet(prompt, false, true, null, "SlopKillerEditor", responseLength);
-    } catch (err) {
-        console.error("[SlopKiller] generateQuietPrompt 오류:", err);
-        return false;
+    }
+
+    if (!raw && typeof genQuiet === "function") {
+        try {
+            raw = await genQuiet(prompt, false, true, null, "SlopKillerEditor", responseLength);
+            raw = String(raw ?? "");
+        } catch (err) {
+            console.error("[SlopKiller] generateQuietPrompt 오류:", err?.message ?? err);
+        }
     }
     console.log(`[SlopKiller] 모델 응답 (앞 120자): "${String(raw).slice(0, 120).replace(/\n/g, " ")}"`);
 
