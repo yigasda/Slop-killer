@@ -699,7 +699,9 @@ async function rerollSurgically(c, mesId, phrases) {
 
 async function maybeReroll(rawId) {
     const s = getSettings();
-    if (!s.enabled || !s.autoReroll || _rerollBusy) return;
+    if (!s.enabled) { console.log(`[SlopKiller] maybeReroll(${rawId}) 스킵: 확장 비활성`); return; }
+    if (!s.autoReroll) { console.log(`[SlopKiller] maybeReroll(${rawId}) 스킵: 자동 리롤 OFF`); return; }
+    if (_rerollBusy) { console.log(`[SlopKiller] maybeReroll(${rawId}) 스킵: 이미 리롤 진행 중`); return; }
 
     const mesId = Number(rawId);
     const c = ctx();
@@ -708,14 +710,15 @@ async function maybeReroll(rawId) {
     // which is independent of message position. QR2/other extensions may add
     // messages after ours, so checking chat.length-1 would always bail out.
     const msg = chat[mesId];
-    if (!msg || msg.is_user || msg.is_system) return;
+    if (!msg) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 메시지 없음`); return; }
+    if (msg.is_user || msg.is_system) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 유저/시스템 메시지`); return; }
 
     const phrases = mergedBanned();
-    if (phrases.length === 0) return;
-    if (earliestBannedPos(msg.mes, phrases) < 0) return;
+    if (phrases.length === 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 금지어 없음`); return; }
+    if (earliestBannedPos(msg.mes, phrases) < 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 메시지에 금지 표현 없음`); return; }
 
     const spent = _rerollCount.get(mesId) || 0;
-    if (spent >= s.rerollMax) return;
+    if (spent >= s.rerollMax) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: rerollMax 소진 (${spent}/${s.rerollMax})`); return; }
 
     console.log(`[SlopKiller] 자동 리롤 시작: mesId=${mesId}, 시도=${spent + 1}/${s.rerollMax}`);
     _rerollBusy = true;
@@ -1704,7 +1707,13 @@ jQuery(() => {
         // load, not on abort), so we use it to mark which message is eligible for
         // auto-reroll. The reroll itself runs after GENERATION_ENDED, deferred via
         // setTimeout so the continue call isn't nested inside the generation pipeline.
-        eventSource.on(event_types.MESSAGE_RECEIVED, (mesId) => { _lastFreshId = Number(mesId); });
+        eventSource.on(event_types.MESSAGE_RECEIVED, (mesId) => {
+            const id = Number(mesId);
+            _lastFreshId = id;
+            // Fresh generation → reset attempt counter so the user gets a full
+            // rerollMax budget on every new swipe/regen of this mesId.
+            _rerollCount.delete(id);
+        });
         eventSource.on(event_types.GENERATION_ENDED, () => {
             restorePenalty();
             if (_lastFreshId === null) return;
