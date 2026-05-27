@@ -29,7 +29,7 @@
     /* ===== Hero ===== */
     header.hero {
         text-align: center;
-        padding: 32px 24px 20px;
+        padding: 60px 24px 44px;
         background: #fff0ef;
     }
 
@@ -55,7 +55,7 @@
     }
 
     .hero h1 {
-        font-size: 2.4rem;
+        font-size: 3.4rem;
         font-weight: 800;
         letter-spacing: -0.02em;
         line-height: 1.1;
@@ -63,12 +63,12 @@
     }
     .hero h1 .en {
         display: block;
-        font-size: 0.95rem;
+        font-size: 1.2rem;
         font-weight: 600;
         letter-spacing: 0.2em;
         color: #e6739a;
         text-transform: uppercase;
-        margin-top: 8px;
+        margin-top: 14px;
     }
     .hero p.lead {
         font-size: 1.18rem;
@@ -78,21 +78,21 @@
     }
 
     /* ===== Section scaffolding ===== */
-    section { padding: 24px 0; }
-    .section-head { text-align: center; margin-bottom: 18px; }
+    section { padding: 44px 0; }
+    .section-head { text-align: center; margin-bottom: 30px; }
     .section-head .kicker {
-        font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em;
+        font-size: 0.82rem; font-weight: 700; letter-spacing: 0.12em;
         text-transform: uppercase; color: #e6739a;
-        margin-bottom: 7px;
+        margin-bottom: 10px;
     }
     .section-head h2 {
-        font-size: 1.55rem;
+        font-size: 2rem;
         font-weight: 800; letter-spacing: -0.01em;
         word-break: keep-all;
     }
     .section-head p {
-        color: #8a6b71; max-width: 560px; margin: 8px auto 0;
-        font-size: 0.93rem;
+        color: #8a6b71; max-width: 560px; margin: 12px auto 0;
+        font-size: 1.02rem;
     }
 
     /* ===== Problem strip ===== */
@@ -121,28 +121,28 @@
     /* ===== Feature grid ===== */
     .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 18px;
     }
     .feature {
         background: #ffffff;
         border: 1px solid rgba(110, 42, 62, 0.10);
-        border-radius: 16px;
-        padding: 18px 20px;
-        box-shadow: 0 2px 8px rgba(180, 90, 120, 0.07);
+        border-radius: 24px;
+        padding: 30px 30px;
+        box-shadow: 0 3px 12px rgba(180, 90, 120, 0.08);
         transition: transform 0.18s ease, box-shadow 0.18s ease;
     }
-    .feature:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(180, 90, 120, 0.10); }
+    .feature:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(180, 90, 120, 0.10); }
     .feature .ico {
-        width: 38px; height: 38px;
+        width: 52px; height: 52px;
         display: flex; align-items: center; justify-content: center;
-        border-radius: 11px;
-        font-size: 1.15rem;
-        margin-bottom: 10px;
+        border-radius: 16px;
+        font-size: 1.5rem;
+        margin-bottom: 16px;
         background: linear-gradient(135deg, #ffe3ec, #ffd0de);
     }
-    .feature h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; color: #4a2c33; word-break: keep-all; line-height: 1.4; }
-    .feature p { color: #8a6b71; font-size: 0.87rem; word-break: keep-all; }
+    .feature h3 { font-size: 1.18rem; font-weight: 700; margin-bottom: 8px; color: #4a2c33; word-break: keep-all; }
+    .feature p { color: #8a6b71; font-size: 0.96rem; word-break: keep-all; }
 
     /* ===== Detailed sections (deep dive) ===== */
     .deep-wrap {
@@ -150,59 +150,59 @@
         border-top: 1px solid rgba(110, 42, 62, 0.10);
         border-bottom: 1px solid rgba(110, 42, 62, 0.10);
     }
-    .deep { display: flex; flex-direction: column; gap: 10px; }
+    .deep { display: flex; flex-direction: column; gap: 18px; }
     .detail {
         background: #ffffff;
         border: 1px solid rgba(110, 42, 62, 0.10);
-        border-radius: 14px;
-        box-shadow: 0 2px 8px rgba(180, 90, 120, 0.07);
+        border-radius: 24px;
+        box-shadow: 0 3px 12px rgba(180, 90, 120, 0.08);
     }
     .detail-head {
-        display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
-        padding: 13px 20px;
+        display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px;
+        padding: 22px 28px;
         background: linear-gradient(180deg, #fff6f8, #ffffff);
         border-bottom: 1px solid rgba(110, 42, 62, 0.10);
-        border-top-left-radius: 14px;
-        border-top-right-radius: 14px;
+        border-top-left-radius: 24px;
+        border-top-right-radius: 24px;
     }
     .detail-head .num {
         flex-shrink: 0;
-        width: 30px; height: 30px;
+        width: 40px; height: 40px;
         display: flex; align-items: center; justify-content: center;
-        border-radius: 8px;
-        font-weight: 800; font-size: 0.88rem;
+        border-radius: 12px;
+        font-weight: 800; font-size: 1.05rem;
         color: #ffffff;
         background: linear-gradient(135deg, #e6739a, #c8527e);
     }
     .detail-head h3 {
         flex: 1 1 auto; min-width: 0;
-        font-size: 1.05rem; font-weight: 800; color: #4a2c33;
+        font-size: 1.3rem; font-weight: 800; color: #4a2c33;
         word-break: keep-all;
     }
     .detail-head .tag {
         margin-left: auto;
         flex-shrink: 0;
-        font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+        font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em;
         color: #c8527e;
         background: #ffe9ee;
-        padding: 3px 9px; border-radius: 999px;
+        padding: 5px 12px; border-radius: 999px;
         white-space: nowrap;
     }
-    .detail-body { padding: 16px 22px 18px; word-break: keep-all; }
-    .detail-body > p { color: #4a2c33; margin-bottom: 10px; font-size: 0.9rem; }
+    .detail-body { padding: 26px 34px 30px; word-break: keep-all; }
+    .detail-body > p { color: #4a2c33; margin-bottom: 14px; }
     .detail-body > p:last-child { margin-bottom: 0; }
 
-    ul.ticks { list-style: none; display: flex; flex-direction: column; gap: 7px; }
-    ul.ticks li { position: relative; padding-left: 26px; color: #4a2c33; font-size: 0.88rem; }
+    ul.ticks { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    ul.ticks li { position: relative; padding-left: 30px; color: #4a2c33; }
     ul.ticks li::before {
         content: "✓";
         position: absolute; left: 0; top: 0;
         color: #e6739a; font-weight: 800;
         background: #ffe9ee;
-        width: 18px; height: 18px;
-        border-radius: 5px;
+        width: 20px; height: 20px;
+        border-radius: 6px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 0.72rem;
+        font-size: 0.8rem;
     }
     ul.ticks li b { color: #c8527e; }
 
@@ -255,37 +255,37 @@
     }
 
     /* ===== Install ===== */
-    .steps { display: flex; flex-direction: column; gap: 10px; max-width: 640px; margin: 0 auto; }
+    .steps { display: flex; flex-direction: column; gap: 14px; max-width: 680px; margin: 0 auto; }
     .step {
-        display: flex; gap: 14px; align-items: flex-start;
+        display: flex; gap: 18px; align-items: flex-start;
         background: #ffffff;
         border: 1px solid rgba(110, 42, 62, 0.10);
-        border-radius: 12px;
-        padding: 14px 18px;
-        box-shadow: 0 2px 8px rgba(180, 90, 120, 0.07);
+        border-radius: 14px;
+        padding: 20px 24px;
+        box-shadow: 0 3px 12px rgba(180, 90, 120, 0.08);
     }
     .step .s-num {
         flex-shrink: 0;
-        width: 28px; height: 28px;
+        width: 34px; height: 34px;
         display: flex; align-items: center; justify-content: center;
-        border-radius: 8px;
-        font-weight: 800; font-size: 0.9rem;
+        border-radius: 10px;
+        font-weight: 800;
         color: #c8527e;
         background: #ffe9ee;
     }
-    .step .s-body h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 3px; color: #4a2c33; }
-    .step .s-body p { color: #8a6b71; font-size: 0.87rem; }
+    .step .s-body h4 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; color: #4a2c33; }
+    .step .s-body p { color: #8a6b71; font-size: 0.95rem; }
 
     /* ===== Footer ===== */
     footer {
         text-align: center;
-        padding: 24px 24px 32px;
+        padding: 44px 24px 52px;
         color: #8a6b71;
-        font-size: 0.88rem;
+        font-size: 0.9rem;
     }
     footer .fname {
-        font-size: 1.15rem; font-weight: 800; color: #4a2c33;
-        margin-bottom: 6px;
+        font-size: 1.4rem; font-weight: 800; color: #4a2c33;
+        margin-bottom: 8px;
     }
     footer .meta { font-size: 0.84rem; opacity: 0.8; }
 
@@ -310,22 +310,25 @@
         AI 반복 킬러
         <span class="en">Slop Killer</span>
     </h1>
+    <p class="lead">
+        AI가 입버릇처럼 되풀이하는 <span class="hl">똑같은 표현</span>을 찾아내고, 막고,
+        자연스럽게 다시 써 줍니다. 롤플레이의 몰입을 깨는 반복을 끝내세요.
+    </p>
 </header>
 
 <!-- ===================== PROBLEM ===================== -->
 <section class="problem">
     <div class="wrap">
         <div class="section-head">
+            <div class="kicker">왜 필요한가요</div>
             <h2>이런 경험, 있으시죠?</h2>
             <p>모델은 마음에 든 표현을 메시지마다 똑같이 반복합니다. 한 번 눈에 띄면 계속 거슬리죠.</p>
         </div>
-        <div class="quote-card">
+        <div class="quote-card" style="padding: 30px 32px;">
             <div class="label">매 답변마다 등장하는 그 문장…</div>
             <div class="line">"<span class="hl">허리를 감싸 안으며</span>, 그는 나를 끌어당겼다."</div>
             <div class="line">"<span class="hl">허리를 감싸 안으며</span>, 그가 속삭였다."</div>
             <div class="line">"또 <span class="hl">허리를 감싸 안으며</span>…"</div>
-            <div class="line" style="margin-top:10px; color:#8a6b71; font-size:0.93rem;">그 외에도 짐짓, 마찰음, physical blow 같은 표현들…</div>
-            <div class="line" style="margin-top:8px; font-weight:700; color:#c8527e;">이제 보기 싫은 표현과 반복에서 해방될 수 있습니다!</div>
         </div>
     </div>
 </section>
@@ -339,37 +342,37 @@
             <p>반복을 찾는 것에서 그치지 않고, 막고 고치는 것까지 자동으로 처리합니다.</p>
         </div>
         <div class="grid">
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🔍</div>
                 <h3>반복 표현 자동 감지</h3>
                 <p>최근 대화를 훑어 자주 등장한 표현을 빈도순으로 정리해 보여줍니다. 한국어 조사·어미까지 이해합니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🚫</div>
                 <h3>금지어 · 허용어 관리</h3>
                 <p>이제 짐짓, 마찰음, physical blow 등 보기 싫은 표현이나 반복표현에서 해방될 수 있습니다!</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🔄</div>
-                <h3>자동 리롤<br>— 문장만 골라 다시 쓰기</h3>
+                <h3>자동 리롤 (재작성)</h3>
                 <p>금지어가 답변에 나오면, 그 문장만 골라 같은 의미·감정으로 자연스럽게 다시 써 줍니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">💉</div>
-                <h3>프롬프트 주입<br>— 애초에 반복 막기</h3>
+                <h3>프롬프트 주입</h3>
                 <p>생성 직전 "이 표현은 쓰지 마"라는 안내를 모델에게 몰래 끼워 넣어 애초에 반복을 줄입니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">📉</div>
                 <h3>반복 페널티 자동 조절</h3>
                 <p>OpenAI 호환 백엔드에서 frequency / presence penalty를 상황에 맞춰 올려 줍니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">💡</div>
-                <h3>자동 학습<br>— 우회 변형까지 한 번에</h3>
+                <h3>자동 학습</h3>
                 <p>하나를 차단하면, 단어를 공유하는 비슷한 우회 표현들을 찾아 같이 막을지 물어봅니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🖍️</div>
                 <h3>채팅 하이라이트</h3>
                 <p>반복된 표현을 대화창에서 물결 밑줄로 색칠해 한눈에 보이게 합니다.</p>
@@ -397,7 +400,7 @@
                     <h3>반복 표현 자동 감지</h3>
                     <span class="tag">감지 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <ul class="ticks">
                         <li><b>표현 길이 조절</b> — 몇 단어짜리 묶음을 찾을지 정합니다 (최소 2 ~ 최대 4단어가 기본).</li>
                         <li><b>반복 기준</b> — 몇 번 이상 나와야 "반복"으로 칠지 정합니다 (기본 3회).</li>
@@ -419,7 +422,7 @@
                     <h3>금지어 · 허용어 관리</h3>
                     <span class="tag">금지어 · 글로벌 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <ul class="ticks">
                         <li><b>캐릭터별 관리</b> — 캐릭터마다 따로 금지어·허용어 목록을 둘 수 있습니다.</li>
                         <li><b>글로벌(전체 공통)</b> — 모든 캐릭터에 일괄 적용되는 목록. 캐릭터별 목록과 합쳐서 동작합니다.</li>
@@ -440,7 +443,12 @@
                     <h3>자동 리롤 — 문장만 골라 다시 쓰기</h3>
                     <span class="tag">간판 기능</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
+                    <p>
+                        이 확장의 핵심 기능입니다. 등록한 금지어가 답변에 등장하면, <b>그 표현이 들어 있는 문장만</b>
+                        따로 떼어 모델에게 다시 요청합니다. 같은 의미·감정·분량은 그대로 유지하되 금지 표현만 빠지도록
+                        자연스럽게 재작성하고, 원래 메시지의 나머지 부분은 손대지 않습니다.
+                    </p>
                     <div class="before-after">
                         <div class="ba-box ba-before">
                             <div class="ba-label">금지어 등장</div>
@@ -472,10 +480,10 @@
                     <h3>프롬프트 주입 — 애초에 반복 막기</h3>
                     <span class="tag">설정 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
-                        생성이 시작되기 직전, "다음 표현은 쓰지 말라"는 프롬프트를 대화에 끼워 넣습니다.
-                        반복이 나오기 전에 예방할 수 있습니다.
+                        생성이 시작되기 직전, "다음 표현은 쓰지 말라"는 <b>시스템 안내문</b>을 대화에 몰래 끼워 넣습니다.
+                        모델이 답변을 만들기 전에 미리 주의를 받으므로, 반복이 나오기 전에 예방할 수 있습니다.
                     </p>
                     <ul class="ticks">
                         <li><code>{{banned}}</code> — 내가 직접 등록한 금지어 목록이 들어갑니다 (강한 금지).</li>
@@ -498,7 +506,7 @@
                     <h3>반복 페널티 자동 조절</h3>
                     <span class="tag">설정 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         반복이 감지되면 모델의 <b>frequency penalty</b>와 <b>presence penalty</b>를 자동으로 살짝 올려,
                         같은 단어를 덜 쓰도록 유도합니다. 생성이 끝나면 원래 값으로 되돌려 놓습니다.
@@ -522,9 +530,11 @@
                     <h3>자동 학습 — 우회 변형까지 한 번에</h3>
                     <span class="tag">설정 탭 · 기본 꺼짐</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
-                        금지어를 추가하면 채팅에서 단어를 공유하는 비슷한 표현을 찾아 함께 차단할지 물어봅니다.
+                        금지어를 하나 추가하면, 채팅 안에서 <b>그 단어를 공유하는 비슷한 표현</b>들을 찾아
+                        "이것들도 같이 막을까요?"라고 물어봅니다. 모델이 금지어를 살짝 바꿔 빠져나가는
+                        우회 변형을 한꺼번에 잡을 수 있습니다.
                     </p>
                     <div class="before-after">
                         <div class="ba-box ba-before">
@@ -552,9 +562,10 @@
                     <h3>채팅 하이라이트</h3>
                     <span class="tag">설정 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         반복된 표현을 대화창에서 <span class="hl">물결 밑줄 + 색칠</span>로 표시합니다.
+                        금지어와 반복 기준을 넘은 표현이 모두 대상이라, 어디서 반복이 일어나는지 즉시 알아챌 수 있습니다.
                     </p>
                     <ul class="ticks">
                         <li>한국어 조사 변형까지 함께 칠합니다 (<code>그녀</code> → <code>그녀는</code>·<code>그녀가</code>도 인식).</li>
@@ -571,7 +582,7 @@
                     <h3>감지 프리셋 · 불용어</h3>
                     <span class="tag">감지 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         감지 설정을 상황에 맞게 저장해 두고 빠르게 전환할 수 있습니다. 자주 쓰는 단어는
                         감지에서 아예 제외할 수도 있습니다.
@@ -598,21 +609,21 @@
             <p>SillyTavern 확장 설치 메뉴에 주소만 붙여 넣으면 끝.</p>
         </div>
         <div class="steps">
-            <div class="step">
+            <div class="step" style="padding: 20px 24px;">
                 <div class="s-num">1</div>
                 <div class="s-body">
                     <h4>확장 메뉴 열기</h4>
                     <p>SillyTavern 상단의 확장(블록 모양) 아이콘 → <b>Install extension</b>을 누릅니다.</p>
                 </div>
             </div>
-            <div class="step">
+            <div class="step" style="padding: 20px 24px;">
                 <div class="s-num">2</div>
                 <div class="s-body">
                     <h4>저장소 주소 붙여넣기</h4>
                     <p>이 확장의 Git 주소를 입력하고 설치합니다. 설치 후 자동으로 활성화됩니다.</p>
                 </div>
             </div>
-            <div class="step">
+            <div class="step" style="padding: 20px 24px;">
                 <div class="s-num">3</div>
                 <div class="s-body">
                     <h4>마술봉에서 열기</h4>
@@ -627,7 +638,7 @@
 <footer>
     <div class="fname">AI 반복 킬러 · Slop Killer</div>
     <p>AI 롤플레이의 반복을 끝내는 SillyTavern 확장</p>
-    <p class="meta">한국어 · 영어 지원 · v1.0.0</p>
+    <p class="meta">한국어 · 영어 지원 · 4 테마 · v1.0.0</p>
 </footer>
 
 </body>
