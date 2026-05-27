@@ -1902,12 +1902,16 @@ function showCtxMenu(x, y, phrase, mode = "tap") {
     _ctxMenu = menu;
     _ctxMode = mode;
 
+    // 실제 렌더 크기를 재서 선택 중심 정렬 + 화면 안쪽으로 클램프
     const vw = window.innerWidth, vh = window.innerHeight;
-    const mw = 220, mh = 72;
-    const left = Math.max(8, Math.min(x, vw - mw - 8));
-    const top  = (y + mh + 12 > vh) ? y - mh - 8 : y + 10;
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    let left = Math.round(x - mw / 2);
+    left = Math.max(8, Math.min(left, vw - mw - 8));
+    let top = y + 8;                               // 텍스트 바로 아래
+    if (top + mh + 8 > vh) top = y - mh - 8;       // 아래 공간 없으면 위로
+    top = Math.max(8, top);
     menu.style.left = `${left}px`;
-    menu.style.top  = `${Math.max(8, top)}px`;
+    menu.style.top  = `${top}px`;
 
     menu.querySelector(".sk_ctx_btn").addEventListener("click", () => {
         addBanned(phrase);
