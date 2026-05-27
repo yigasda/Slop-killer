@@ -319,12 +319,26 @@ body[data-sk-theme] #slop_killer_panel hr {
 /* Banned-phrase input row */
 .sk_ban_row {
     display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 6px;
     margin: 4px 0 8px;
 }
 
 .sk_ban_row .text_pole {
     flex: 1;
+    min-width: 0;
+    height: 32px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.sk_ban_row .menu_button {
+    flex-shrink: 0;
+    white-space: nowrap;
+    height: 32px;
+    padding: 0 12px;
+    line-height: 32px;
 }
 
 /* JSON import/export row */
