@@ -1195,7 +1195,7 @@ function buildPanel() {
                     <hr>
                     <h4><i class="fa-solid fa-ban sk_h4_icon"></i>등록된 금지어</h4>
                     <p class="sk_hint">위 목록에서 <i class="fa-solid fa-ban sk_ic_ban"></i>를 누르거나, 아래에 직접 입력해 추가할 수 있습니다.</p>
-                    <p class="sk_hint">💡 한국어는 조사·어미가 달라도 자동으로 같이 차단됩니다. <b>메인 텍스트(어간)만</b> 등록하면 됩니다 — 예: <code>허리</code> 하나로 허리를·허리에·허리가 모두 차단. 표현이 짧게 잘려 보이는 것이 정상입니다.</p>
+                    <p class="sk_hint">💡 기본 표현 하나로 AI가 우회하여 생성하는 변형 표현까지 모두 차단합니다. 표현이 짧게 잘려 보이는 것이 정상입니다.</p>
                     <div class="sk_ban_row">
                         <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
                         <button id="sk_ban_add" class="menu_button">추가</button>
