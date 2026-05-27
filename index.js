@@ -116,7 +116,12 @@ const KO_STOPWORDS = new Set((
     "아니 아니라 아닌 않고 않아 않은 안 못 " +
     "없다 없어 없는 없고 있다 있어 있는 있고 " +
     "하지 하고 하며 해서 해야 했다 했어 됐다 됐어 " +
-    "말고 뿐이야 뿐이에요"
+    "말고 뿐이야 뿐이에요 " +
+    // 구어체 어미·접속사·대명사 축약형 — 1~2단어 감지 노이즈 방지
+    "들어 텐데 거지 그게 이게 저게 그리 이리 저리 " +
+    "그래요 그랬어 근데 " +
+    "있으면 있었다 없으면 없었다 " +
+    "뭐 왜 "
 ).split(/\s+/).filter(Boolean));
 
 // Korean particles / endings stripped (longest match first) to group inflected
@@ -263,7 +268,8 @@ function stripKoSuffix(w) {
 // 1 char), so words like "수가"→stem"수" or "없는"→stem"없" are filtered.
 function isKoContentWord(tok, stop) {
     if (stop.has(tok)) return false;
-    if (!isHangulToken(tok)) return true;
+    if (/^\d+$/.test(tok)) return false;           // pure numbers (timestamps: 12, 31)
+    if (!isHangulToken(tok)) return tok.length > 2; // filter "am", "pm", etc.
     if (tok.length <= 1) return false;
     for (const suf of KO_SUFFIXES) {
         if (tok.endsWith(suf) && tok.length > suf.length) {
@@ -279,7 +285,14 @@ function isKoContentWord(tok, stop) {
 function effectiveStopwords() {
     const s = getSettings();
     const set = new Set(STOPWORDS);
-    for (const w of KO_STOPWORDS) set.add(w);
+    for (const w of KO_STOPWORDS) {
+        set.add(w);
+        // Also add the suffix-stripped stem so that when computeCounts normalizes
+        // tokens, the stem form still hits the stopword set.
+        // e.g. "그리고" → stem "그리": prevents the stripped token from passing.
+        const stem = stripKoSuffix(w);
+        if (stem !== w && stem.length >= 2) set.add(stem);
+    }
     if (s.customStopwords) {
         for (const w of String(s.customStopwords).split(/[\s,]+/)) {
             const k = w.trim().toLowerCase();
