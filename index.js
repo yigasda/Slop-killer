@@ -563,7 +563,7 @@ function buildRewritePrompt(before, target, after, phrases) {
         "- Change ONLY the banned phrase. Leave every other word as close to the original as possible.",
         "- Keep the SAME language. Do not translate.",
         "- Keep the tone, style, voice, and approximate length.",
-        "- CRITICAL: preserve the exact meaning, sentiment, and direction. Do NOT reinterpret the sentence. If it expresses gratitude, apology, or self-reflection, the result must keep that — never flip it into blame or accusation, and never change who is doing what to whom.",
+        "- CRITICAL: keep the original meaning. Do NOT reinterpret or rephrase the rest of the sentence — only the banned phrase should change.",
         "- Output ONLY the rewritten passage. No greeting, explanation, quotes, or labels.",
         "",
         ctxBefore ? `CONTEXT BEFORE (reference only, do not rewrite):\n${ctxBefore}` : "",
