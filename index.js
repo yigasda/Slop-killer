@@ -477,24 +477,126 @@ function earliestBannedPos(text, phrases) {
     return m ? m.index : -1;
 }
 
-// Index just after the last sentence/line terminator before `idx`, or -1.
-function lastBoundaryBefore(text, idx) {
-    const slice = text.slice(0, idx);
-    const re = /[.!?…]["'”’)\]]*\s+|\n+/g;
-    let best = -1, m;
-    while ((m = re.exec(slice)) !== null) best = m.index + m[0].length;
-    return best;
+// Find the sentence containing position `idx`. Returns {start, end} where
+// text.slice(start, end) is the whole sentence (with trailing punct/newline).
+function sentenceBoundsAt(text, idx) {
+    const beforeRe = /[.!?…]["'”’)\]]*\s+|\n+/g;
+    let start = 0, m;
+    while ((m = beforeRe.exec(text)) !== null) {
+        if (m.index + m[0].length > idx) break;
+        start = m.index + m[0].length;
+    }
+    const afterRe = /[.!?…]["'”’)\]]*(?:\s+|$)|\n/g;
+    afterRe.lastIndex = idx;
+    const after = afterRe.exec(text);
+    const end = after ? after.index + after[0].length : text.length;
+    return { start, end };
 }
 
-// Returns the truncated message kept before the offending passage, or null
-// if there is nothing worth keeping (banned phrase at the very start).
-function truncateForReroll(text, phrases) {
+// Expand bounds to cover ALL contiguous banned occurrences (so if two banned
+// phrases sit in adjacent sentences we replace them together in one call).
+function expandBoundsForAllBanned(text, phrases, initialBounds) {
+    const re = buildPhraseRegex(phrases);
+    if (!re) return initialBounds;
+    let { start, end } = initialBounds;
+    while (true) {
+        re.lastIndex = 0;
+        let extended = false;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+            if (m.index >= start && m.index < end) continue;          // already inside
+            if (m.index >= end - 20 && m.index < end + 80) {           // hugs the right edge
+                const b = sentenceBoundsAt(text, m.index);
+                end = Math.max(end, b.end);
+                extended = true;
+            } else if (m.index + m[0].length > start - 20 && m.index < start) {
+                const b = sentenceBoundsAt(text, m.index);
+                start = Math.min(start, b.start);
+                extended = true;
+            }
+        }
+        if (!extended) break;
+    }
+    return { start, end };
+}
+
+function buildRewritePrompt(before, target, after, phrases) {
+    const ctxBefore = before.slice(-600).trim();
+    const ctxAfter = after.slice(0, 600).trim();
+    const banList = phrases.map(p => `"${p}"`).join(", ");
+    return [
+        "당신은 진행 중인 롤플레이 응답의 한 구간을 다시 쓰고 있습니다.",
+        "다른 화자나 메타 코멘트를 넣지 말고, 같은 문체·시점·언어로 자연스럽게 이어지게 쓰세요.",
+        "",
+        "[앞 문맥]",
+        ctxBefore || "(없음)",
+        "",
+        "[원본 — 이 부분만 다시 씁니다]",
+        target.trim(),
+        "",
+        "[뒤 문맥]",
+        ctxAfter || "(없음)",
+        "",
+        `다음 표현은 절대 사용 금지: ${banList}.`,
+        "원본과 비슷한 길이로, 같은 의미·흐름을 유지하면서 금지 표현 없이 다시 쓰세요.",
+        "설명·서두·따옴표 없이 새 본문만 출력하세요.",
+    ].join("\n");
+}
+
+async function rerollSurgically(c, mesId, phrases) {
+    const cur = c.chat[mesId];
+    if (!cur) return false;
+    const text = cur.mes;
     const pos = earliestBannedPos(text, phrases);
-    if (pos < 0) return null;
-    const boundary = lastBoundaryBefore(text, pos);
-    const cut = boundary > 0 ? boundary : pos;   // fall back to mid-sentence cut
-    const kept = text.slice(0, cut).trimEnd();
-    return kept.length ? kept : null;
+    if (pos < 0) return true;                          // nothing to do — success
+
+    const initial = sentenceBoundsAt(text, pos);
+    const { start, end } = expandBoundsForAllBanned(text, phrases, initial);
+    const before = text.slice(0, start);
+    const target = text.slice(start, end);
+    const after = text.slice(end);
+    if (!target.trim()) return false;
+
+    const prompt = buildRewritePrompt(before, target, after, phrases);
+    let raw = "";
+    try {
+        const quiet = c.generateQuietPrompt ?? globalThis.generateQuietPrompt;
+        if (typeof quiet === "function") {
+            // generateQuietPrompt(quietPrompt, quietToLoud=false, skipWIAN=false, ...)
+            raw = await quiet(prompt, false, false);
+        } else {
+            const execSlash = globalThis.executeSlashCommandsWithOptions ?? globalThis.executeSlashCommands;
+            if (!execSlash) { console.error("[SlopKiller] no generation API found"); return false; }
+            // Fallback: escape pipes/braces and feed to /genraw via {: :} closure.
+            const safe = prompt.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\{:/g, "\\{:").replace(/:}/g, "\\:}");
+            const result = await execSlash(`/genraw {: ${safe} :}`);
+            raw = (result && (result.pipe ?? result)) ?? "";
+        }
+    } catch (err) {
+        console.error("[SlopKiller] generateQuietPrompt failed:", err);
+        return false;
+    }
+    let replacement = String(raw).trim();
+    if (!replacement) return false;
+    // Strip wrapping quotes if the model added them.
+    replacement = replacement.replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
+    if (!replacement) return false;
+    // Bail if the model echoed a banned phrase right back at us.
+    if (earliestBannedPos(replacement, phrases) >= 0) return false;
+
+    const needsLeadingSpace = before.length && !/\s$/.test(before) && !/^\s/.test(replacement);
+    const needsTrailingSpace = after.length && !/^\s/.test(after) && !/\s$/.test(replacement);
+    const stitched =
+        before +
+        (needsLeadingSpace ? " " : "") +
+        replacement +
+        (needsTrailingSpace ? " " : "") +
+        after;
+
+    cur.mes = stitched;
+    c.updateMessageBlock(mesId, cur);
+    await c.saveChat();
+    return true;
 }
 
 async function maybeReroll(rawId) {
@@ -517,18 +619,11 @@ async function maybeReroll(rawId) {
 
     _rerollBusy = true;
     try {
-        let cur = msg;
         for (let attempt = spent; attempt < s.rerollMax; attempt++) {
-            const kept = truncateForReroll(cur.mes, phrases);
-            if (kept === null) break;                 // nothing to salvage — leave as-is
-            cur.mes = kept;
-            c.updateMessageBlock(mesId, cur);
-            await c.saveChat();
             _rerollCount.set(mesId, attempt + 1);
-            const execSlash = globalThis.executeSlashCommandsWithOptions ?? globalThis.executeSlashCommands;
-            if (!execSlash) { console.error("[SlopKiller] executeSlashCommandsWithOptions not found"); break; }
-            await execSlash("/continue");
-            cur = c.chat[mesId];                       // continue may replace the object
+            const ok = await rerollSurgically(c, mesId, phrases);
+            if (!ok) break;
+            const cur = c.chat[mesId];
             if (!cur || earliestBannedPos(cur.mes, phrases) < 0) break;
         }
     } catch (err) {
@@ -926,6 +1021,7 @@ function buildPanel() {
                     <input id="sk_threshold" type="range" min="2" max="15" value="${s.threshold}" class="sk_slider">
                     <label>훑어볼 범위 — 최근 <span id="sk_scanDepth_val">${s.scanDepth}</span>개 메시지</label>
                     <input id="sk_scanDepth" type="range" min="5" max="200" step="5" value="${s.scanDepth}" class="sk_slider">
+                    <p class="sk_hint">한국어는 조사·어미 때문에 2단어 조합이 노이즈가 많습니다. <b>최소 3단어</b>를 권장합니다.</p>
 
                     <hr>
                     <h4><i class="fa-solid fa-filter sk_h4_icon"></i>불용어</h4>
@@ -986,7 +1082,7 @@ function buildPanel() {
                         <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
                         <span>등록한 금지어가 답변에 나오면 자동으로 다시 생성합니다</span>
                     </label>
-                    <p class="sk_hint">금지어 직전 문장까지 남기고 그 뒤만 이어쓰기로 재생성합니다. 토큰이 추가로 소모됩니다.</p>
+                    <p class="sk_hint">금지 표현이 들어 있는 <b>문장만</b> 별도로 모델에 다시 요청해서 그 부분만 교체합니다. 메시지의 나머지는 그대로 유지됩니다. (토큰이 추가로 소모됩니다)</p>
                     <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
                     <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
 
