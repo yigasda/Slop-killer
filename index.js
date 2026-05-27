@@ -1687,6 +1687,9 @@ function addWandButton() {
 jQuery(() => {
     try {
         const { eventSource, event_types } = ctx();
+        console.log("[SlopKiller] 이벤트 등록:",
+            "MESSAGE_RECEIVED=", event_types?.MESSAGE_RECEIVED,
+            "GENERATION_ENDED=", event_types?.GENERATION_ENDED);
 
         getSettings();
         applyColor();
@@ -1709,6 +1712,7 @@ jQuery(() => {
         // setTimeout so the continue call isn't nested inside the generation pipeline.
         eventSource.on(event_types.MESSAGE_RECEIVED, (mesId) => {
             const id = Number(mesId);
+            console.log(`[SlopKiller] MESSAGE_RECEIVED: mesId=${mesId} → _lastFreshId=${id}`);
             _lastFreshId = id;
             // Fresh generation → reset attempt counter so the user gets a full
             // rerollMax budget on every new swipe/regen of this mesId.
@@ -1716,6 +1720,7 @@ jQuery(() => {
         });
         eventSource.on(event_types.GENERATION_ENDED, () => {
             restorePenalty();
+            console.log(`[SlopKiller] GENERATION_ENDED: _lastFreshId=${_lastFreshId}`);
             if (_lastFreshId === null) return;
             const id = _lastFreshId;
             _lastFreshId = null;
