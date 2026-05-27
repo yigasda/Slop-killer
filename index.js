@@ -572,6 +572,25 @@ function looksLikeGreetingOrRefusal(text) {
     return bad.some(p => t.startsWith(p) || (t.length < 200 && t.includes(p)));
 }
 
+// Detect if the model echoed the surrounding context instead of rewriting.
+// This happens when the model ignores the instruction and just continues the RP
+// narrative — outputting text that was already in before/after.
+function looksLikeEcho(replacement, before, after) {
+    const rep = replacement.trim().replace(/\s+/g, " ");
+    if (!rep) return true;
+    // If the replacement starts with the same phrase (≥10 chars) as the end of
+    // "before", the model echoed the context prefix.
+    const beforeTail = before.replace(/\s+/g, " ").trim().slice(-60);
+    if (beforeTail.length >= 10) {
+        const overlap = beforeTail.slice(-Math.min(beforeTail.length, 30));
+        if (overlap.length >= 10 && rep.startsWith(overlap.slice(0, 20))) return true;
+    }
+    // If the replacement is a substring already present in before or after,
+    // it's likely echoed verbatim.
+    if (before.length > 20 && before.includes(rep.slice(0, Math.min(rep.length, 30)))) return true;
+    return false;
+}
+
 async function rerollSurgically(c, mesId, phrases) {
     const cur = c.chat[mesId];
     if (!cur) return false;
@@ -643,8 +662,18 @@ async function rerollSurgically(c, mesId, phrases) {
         console.warn("[SlopKiller] 모델이 챗봇/RP 모드로 응답함 — 폐기");
         return false;
     }
+    // Reject if the model echoed the surrounding context instead of rewriting.
+    if (looksLikeEcho(replacement, before, after)) {
+        console.warn(`[SlopKiller] 모델이 컨텍스트 에코함 — 폐기: "${replacement.slice(0, 60)}"`);
+        return false;
+    }
     if (earliestBannedPos(replacement, phrases) >= 0) {
         console.warn("[SlopKiller] 응답에 금지 표현이 그대로 있음 — 폐기");
+        return false;
+    }
+    // Reject if replacement is identical to the original (model didn't change anything).
+    if (replacement.replace(/\s+/g, " ") === target.trim().replace(/\s+/g, " ")) {
+        console.warn("[SlopKiller] 모델이 원문 그대로 반환함 — 폐기");
         return false;
     }
     // Length sanity check.
@@ -696,7 +725,7 @@ async function maybeReroll(rawId) {
             console.log(`[SlopKiller] rerollSurgically 호출 중... (attempt ${attempt + 1})`);
             const ok = await rerollSurgically(c, mesId, phrases);
             console.log(`[SlopKiller] rerollSurgically 결과: ok=${ok}`);
-            if (!ok) break;
+            if (!ok) continue;   // validation failed → try again up to rerollMax
             const cur = c.chat[mesId];
             if (!cur || earliestBannedPos(cur.mes, phrases) < 0) {
                 console.log("[SlopKiller] 금지 표현 제거 완료");
