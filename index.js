@@ -36,6 +36,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     penaltyBoost: 0.3,  // added to freq/pres penalty on OpenAI-compatible backends
     autoReroll: true,   // re-generate (via continue) when a banned phrase appears
     rerollMax: 3,       // max continue attempts per message
+    autoLearnEnabled: true,    // after manual ban, suggest similar n-grams found in chat
     rewriteMode: "rewrite",
     characters: {},     // charName -> { banned: [], allowed: [] }
     global: { banned: [], allowed: [] },   // applied across every character
@@ -1019,7 +1020,125 @@ function applyTheme() {
 // ====================================================================
 // Ban / allow actions — per-character and global, plus promote/demote
 // ====================================================================
-function addBanned(phrase) {
+
+// Auto-learn: after a user bans phrase X, surface other same-length n-grams
+// in the chat that share ≥ 1 content word with X. AI bypass variants almost
+// always reuse the core noun/verb stem ("허리 잡고" → "허리 붙잡고", "허리에 손을"),
+// so word-overlap is a reliable signal without needing LLM calls.
+function findSimilarPhrases(bannedPhrase) {
+    const stop = effectiveStopwords();
+    const phrase = normalizePhrase(bannedPhrase);
+    const bannedTokens = phrase.split(/\s+/).filter(Boolean);
+    if (!bannedTokens.length) return [];
+    const bannedContent = bannedTokens.filter(w =>
+        isHangulToken(w) ? isKoContentWord(w, stop) : !stop.has(w));
+    if (!bannedContent.length) return [];
+    const bannedSet = new Set(bannedContent);
+
+    const cd = getCharData(getCurrentCharName());
+    const g = getGlobal();
+    const seen = new Set([
+        ...cd.banned.map(normalizePhrase),
+        ...cd.allowed.map(normalizePhrase),
+        ...g.banned.map(normalizePhrase),
+        ...g.allowed.map(normalizePhrase),
+        phrase,
+    ]);
+
+    const candidates = [];
+    for (const [key, count] of computeCounts()) {
+        if (seen.has(key)) continue;
+        const keyWords = key.split(/\s+/);
+        // Same-length only — different-length n-grams aren't meaningful "variants",
+        // and a shorter subset would be redundant under the suffix-tolerant regex.
+        if (keyWords.length !== bannedTokens.length) continue;
+        let overlap = 0;
+        for (const w of keyWords) if (bannedSet.has(w)) overlap++;
+        if (overlap >= 1) candidates.push({ phrase: key, count, overlap });
+    }
+    candidates.sort((a, b) =>
+        b.overlap - a.overlap ||
+        b.count - a.count ||
+        b.phrase.length - a.phrase.length);
+    return candidates.slice(0, 12);
+}
+
+function showAutoLearnModal(bannedPhrase, candidates) {
+    return new Promise((resolve) => {
+        const backdrop = document.createElement("div");
+        backdrop.className = "sk_al_backdrop";
+        const dlg = document.createElement("div");
+        dlg.className = "sk_al_dialog";
+        dlg.innerHTML = `
+            <div class="sk_al_header">
+                <h3><i class="fa-solid fa-lightbulb"></i> 자동 학습 — 비슷한 표현 발견</h3>
+                <p>방금 차단한 <code>${escapeHtml(bannedPhrase)}</code> 와(과) 단어를 공유하는 표현이 <b>${candidates.length}개</b> 더 있습니다.</p>
+            </div>
+            <div class="sk_al_topbar">
+                <button class="menu_button sk_al_all">모두 선택</button>
+                <button class="menu_button sk_al_none">모두 해제</button>
+            </div>
+            <div class="sk_al_list">
+                ${candidates.map(c => `
+                    <label class="sk_al_item">
+                        <input type="checkbox" data-p="${escapeHtml(c.phrase)}" checked>
+                        <span class="sk_al_phrase">${escapeHtml(c.phrase)}</span>
+                        <span class="sk_al_count">×${c.count}</span>
+                    </label>
+                `).join("")}
+            </div>
+            <div class="sk_al_footer">
+                <button class="menu_button sk_al_cancel">취소</button>
+                <button class="menu_button sk_al_confirm"><i class="fa-solid fa-ban"></i> 선택 항목 차단</button>
+            </div>
+        `;
+        document.body.appendChild(backdrop);
+        document.body.appendChild(dlg);
+
+        const close = (result) => {
+            backdrop.remove();
+            dlg.remove();
+            document.removeEventListener("keydown", onKey);
+            resolve(result);
+        };
+        const onKey = (e) => { if (e.key === "Escape") close([]); };
+        document.addEventListener("keydown", onKey);
+
+        backdrop.addEventListener("click", () => close([]));
+        dlg.querySelector(".sk_al_cancel").addEventListener("click", () => close([]));
+        dlg.querySelector(".sk_al_all").addEventListener("click", () =>
+            dlg.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = true));
+        dlg.querySelector(".sk_al_none").addEventListener("click", () =>
+            dlg.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = false));
+        dlg.querySelector(".sk_al_confirm").addEventListener("click", () => {
+            const picked = [...dlg.querySelectorAll('input[type="checkbox"]:checked')]
+                .map(c => c.dataset.p);
+            close(picked);
+        });
+    });
+}
+
+async function maybeAutoLearn(bannedPhrase, scope) {
+    const s = getSettings();
+    if (!s.autoLearnEnabled) return;
+    const candidates = findSimilarPhrases(bannedPhrase);
+    if (!candidates.length) return;
+    const picked = await showAutoLearnModal(bannedPhrase, candidates);
+    if (!picked.length) return;
+
+    const target = scope === "global" ? getGlobal() : getCharData(getCurrentCharName());
+    for (const raw of picked) {
+        const np = normalizePhrase(raw);
+        if (!np) continue;
+        target.allowed = target.allowed.filter(x => normalizePhrase(x) !== np);
+        if (!target.banned.some(x => normalizePhrase(x) === np)) target.banned.push(np);
+    }
+    save();
+    renderPanel();
+    refreshAllHighlights();
+}
+
+async function addBanned(phrase) {
     const p = normalizePhrase(phrase);
     if (!p) return;
     const cd = getCharData(getCurrentCharName());
@@ -1028,6 +1147,7 @@ function addBanned(phrase) {
     save();
     renderPanel();
     refreshAllHighlights();
+    await maybeAutoLearn(p, "char");
 }
 
 function addAllowed(phrase) {
@@ -1051,7 +1171,7 @@ function removeFrom(kind, phrase) {
     refreshAllHighlights();
 }
 
-function addBannedGlobal(phrase) {
+async function addBannedGlobal(phrase) {
     const p = normalizePhrase(phrase);
     if (!p) return;
     const g = getGlobal();
@@ -1060,6 +1180,7 @@ function addBannedGlobal(phrase) {
     save();
     renderPanel();
     refreshAllHighlights();
+    await maybeAutoLearn(p, "global");
 }
 
 function addAllowedGlobal(phrase) {
@@ -1298,6 +1419,14 @@ function buildPanel() {
                     <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
 
                     <hr>
+                    <h4><i class="fa-solid fa-lightbulb sk_h4_icon"></i>자동 학습</h4>
+                    <label class="checkbox_label">
+                        <input id="sk_autoLearnEnabled" type="checkbox" ${s.autoLearnEnabled ? "checked" : ""}>
+                        <span>금지어 추가 시 비슷한 표현 자동 추천</span>
+                    </label>
+                    <p class="sk_hint">금지어를 추가하면, 채팅 안에서 그 단어를 공유하는 비슷한 표현을 찾아서 같이 차단할지 물어봅니다. AI의 우회 변형을 한 번에 잡을 수 있습니다.</p>
+
+                    <hr>
                     <h4><i class="fa-solid fa-arrows-rotate sk_h4_icon"></i>중복 표현 자동 리롤</h4>
                     <label class="checkbox_label">
                         <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
@@ -1471,6 +1600,7 @@ function bindPanel() {
     bindCheckbox("sk_penaltyEnabled", "penaltyEnabled");
     bindSlider("sk_penaltyBoost", "penaltyBoost", parseFloat);
 
+    bindCheckbox("sk_autoLearnEnabled", "autoLearnEnabled");
     bindCheckbox("sk_autoReroll", "autoReroll");
     bindSlider("sk_rerollMax", "rerollMax");
 
