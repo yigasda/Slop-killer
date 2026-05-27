@@ -559,10 +559,11 @@ function buildRewritePrompt(before, target, after, phrases) {
     const ctxAfter = after.slice(0, 200).trim().replace(/[\r\n]+/g, " ");
     const targetLine = target.trim().replace(/[\r\n]+/g, " ");
     return [
-        `Task: rewrite the PASSAGE below so it does NOT contain ${banList}.`,
+        `Task: minimally edit the PASSAGE below so it does NOT contain ${banList}.`,
+        "- Change ONLY the banned phrase. Leave every other word as close to the original as possible.",
         "- Keep the SAME language. Do not translate.",
         "- Keep the tone, style, voice, and approximate length.",
-        "- Preserve the meaning; swap the banned phrase for a natural alternative.",
+        "- CRITICAL: preserve the exact meaning, sentiment, and direction. Do NOT reinterpret the sentence. If it expresses gratitude, apology, or self-reflection, the result must keep that — never flip it into blame or accusation, and never change who is doing what to whom.",
         "- Output ONLY the rewritten passage. No greeting, explanation, quotes, or labels.",
         "",
         ctxBefore ? `CONTEXT BEFORE (reference only, do not rewrite):\n${ctxBefore}` : "",
