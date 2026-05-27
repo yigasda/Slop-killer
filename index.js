@@ -121,8 +121,9 @@ const KO_STOPWORDS = new Set((
     "들어 텐데 거지 그게 이게 저게 그리 이리 저리 " +
     "그래요 그랬어 근데 건데 " +
     "있으면 있었다 없으면 없었다 " +
-    "그거 이거 저거 그건 이건 저건 거야 거든 " +
-    "어디 언제 뭐 왜 누구 어떻게 "
+    "그거 이거 저거 그건 이건 저건 거야 거든 거라고 " +
+    "어디 언제 뭐 왜 누구 어떻게 " +
+    "그렇게 이렇게 저렇게 않았다 않는다 않아 "
 ).split(/\s+/).filter(Boolean));
 
 // Korean particles / endings stripped (longest match first) to group inflected
@@ -322,7 +323,10 @@ function computeCounts() {
         m && !m.is_user && !m.is_system && typeof m.mes === "string" && m.mes.trim()
     ).slice(-s.scanDepth);
 
-    const agg = new Map();   // normKey -> { count, surfaces: Map<surface, count> }
+    // Key by stem (suffix-stripped) form — "입술을/입술이/입술" all merge to "입술",
+    // "소망이/소망이가" all merge to "소망". Stem is used as the display form too:
+    // it matches what users consider the "main text" and what the ban regex targets.
+    const agg = new Map();
     for (const m of msgs) {
         for (const surf of tokenizeSentences(m.mes)) {
             const norm = surf.map(stripKoSuffix);
@@ -339,23 +343,13 @@ function computeCounts() {
                     const minContent = n === 1 ? 1 : 2;
                     if (normGram.filter(w => isKoContentWord(w, stop)).length < minContent) continue;
                     const key = normGram.join(" ");
-                    let e = agg.get(key);
-                    if (!e) { e = { count: 0, surfaces: new Map() }; agg.set(key, e); }
-                    e.count++;
-                    const sf = surf.slice(i, i + n).join(" ");
-                    e.surfaces.set(sf, (e.surfaces.get(sf) || 0) + 1);
+                    agg.set(key, (agg.get(key) || 0) + 1);
                 }
             }
         }
     }
 
-    const counts = new Map();
-    for (const e of agg.values()) {
-        let rep = "", best = -1;
-        for (const [sf, c] of e.surfaces) if (c > best) { best = c; rep = sf; }
-        counts.set(rep, (counts.get(rep) || 0) + e.count);
-    }
-    return counts;
+    return agg;
 }
 
 // Direct regex count of a (possibly long) phrase in recent AI messages.
