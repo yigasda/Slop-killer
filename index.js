@@ -1887,33 +1887,6 @@ function renderChipBox(id, list, kind, scope, filter) {
 // ====================================================================
 let _ctxMenu = null;
 
-function wordAtCaret(range) {
-    const node = range.startContainer;
-    if (!node || node.nodeType !== Node.TEXT_NODE) return null;
-    const text = node.textContent;
-    const off = range.startOffset;
-    let s = off, e = off;
-    while (s > 0 && /[\p{L}\p{N}']/u.test(text[s - 1])) s--;
-    while (e < text.length && /[\p{L}\p{N}']/u.test(text[e])) e++;
-    return text.slice(s, e).trim() || null;
-}
-
-function phraseFromEvent(target, x, y) {
-    const hl = target.closest?.(".slop-hl");
-    if (hl) return hl.textContent.trim();
-    const sel = window.getSelection();
-    const selText = sel?.toString().trim().replace(/\s+/g, " ") ?? "";
-    if (selText && selText.length < 120) return selText;
-    let range = null;
-    if (document.caretRangeFromPoint) {
-        range = document.caretRangeFromPoint(x, y);
-    } else if (document.caretPositionFromPoint) {
-        const pos = document.caretPositionFromPoint(x, y);
-        if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); }
-    }
-    return range ? wordAtCaret(range) : null;
-}
-
 function showCtxMenu(x, y, phrase) {
     hideCtxMenu();
     if (!phrase) return;
@@ -1959,12 +1932,14 @@ function initChatContextMenu() {
     const chat = document.getElementById("chat");
     if (!chat) return;
 
-    // PC: 우클릭 — 기존과 동일
+    // 하이라이트 span 위에서만 작동 — 그 외 영역은 네이티브 선택/복사 그대로
     chat.addEventListener("contextmenu", (e) => {
-        const mes = e.target.closest(".mes");
+        const hl = e.target.closest(".slop-hl");
+        if (!hl) return;
+        const mes = hl.closest(".mes");
         if (!mes || mes.getAttribute("is_user") === "true") return;
         e.preventDefault();
-        const phrase = phraseFromEvent(e.target, e.clientX, e.clientY);
+        const phrase = hl.textContent.trim();
         if (phrase) showCtxMenu(e.clientX, e.clientY, phrase);
     });
 
