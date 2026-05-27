@@ -137,7 +137,22 @@ const KO_SUFFIXES = [
 // ====================================================================
 function ctx() { return SillyTavern.getContext(); }
 
-function normalizePhrase(p) { return String(p).toLowerCase().trim(); }
+// Reduce a phrase to its core stem form: strip Korean particles/endings from
+// every Hangul token so "알량한 자존심을", "알량한 자존심이", "알량한 자존심"
+// all collapse to the same canonical key. The detection regex
+// (`expandPhraseForKo`) then adds `(?:suffix)?` back on each stem at match
+// time, so any inflected variant in chat text still matches.
+function extractCorePhrase(p) {
+    return String(p)
+        .trim()
+        .split(/\s+/)
+        .map(tok => isHangulToken(tok) ? stripKoSuffix(tok) : tok)
+        .join(" ");
+}
+
+function normalizePhrase(p) {
+    return extractCorePhrase(String(p).toLowerCase()).trim();
+}
 
 function getSettings() {
     const { extensionSettings } = ctx();
@@ -424,53 +439,12 @@ function injectionLists(cap) {
     return { banned: bannedCapped, slop: slopCapped };
 }
 
-// Common Korean noun particles (조사) used to expand a banned phrase into
-// its inflected variants — so a banned "알량한 자존심이" also explicitly
-// warns the model away from "알량한 자존심을 / ...은 / ...의 / ..." etc.
-const KO_NOUN_PARTICLES = [
-    "", "이", "가", "은", "는", "을", "를", "의", "도", "만", "에",
-    "이라", "라", "이다", "다", "이며", "며", "이고", "고",
-];
-
-// For a phrase, if its LAST token is pure Hangul, generate the same phrase
-// with each common particle replacing the existing suffix on that token.
-// English / mixed phrases are returned as-is.
-function expandPhraseVariants(phrase) {
-    const parts = phrase.trim().split(/\s+/);
-    if (!parts.length) return [phrase];
-    const last = parts[parts.length - 1];
-    if (!isHangulToken(last)) return [phrase];
-    const stem = stripKoSuffix(last);
-    if (stem.length < 2) return [phrase];     // 1-char stems are too ambiguous
-    const prefix = parts.slice(0, -1).join(" ");
-    const seen = new Set();
-    const out = [];
-    for (const p of KO_NOUN_PARTICLES) {
-        const variant = (prefix ? prefix + " " : "") + stem + p;
-        if (!seen.has(variant)) { seen.add(variant); out.push(variant); }
-    }
-    return out;
-}
-
 // Renders an injection template. {{banned}} / {{slop}} / {{phrases}} are
 // substituted with quoted lists; a line is dropped entirely if its placeholder
 // list is empty. Templates with no placeholder get the merged list appended.
-// Each Korean phrase is silently expanded with particle variants so the model
-// sees every common inflection it should avoid.
+// Phrases are already stored as Korean stem cores (via normalizePhrase) — the
+// inject template's "any close variation" clause covers particle/ending forms.
 function buildInjectionText(template, banned, slop) {
-    const expand = arr => {
-        const seen = new Set();
-        const out = [];
-        for (const p of arr) {
-            for (const v of expandPhraseVariants(p)) {
-                const k = v.toLowerCase();
-                if (!seen.has(k)) { seen.add(k); out.push(v); }
-            }
-        }
-        return out;
-    };
-    banned = expand(banned);
-    slop = expand(slop);
     const fmt = arr => arr.map(p => `"${p}"`).join(", ");
     const all = [...banned, ...slop];
     const out = [];
