@@ -1090,7 +1090,7 @@ function showAutoLearnModal(bannedPhrase, candidates) {
             </div>
             <div class="sk_al_footer">
                 <button class="menu_button sk_al_cancel">취소</button>
-                <button class="menu_button sk_al_confirm"><i class="fa-solid fa-ban"></i> 선택 항목 차단</button>
+                <button class="menu_button sk_al_confirm">차단</button>
             </div>
         `;
         document.body.appendChild(backdrop);

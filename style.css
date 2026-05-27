@@ -934,8 +934,11 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_color_c
     padding: 10px 18px 6px;
 }
 .sk_al_topbar .menu_button {
-    font-size: 0.78rem;
-    padding: 4px 10px;
+    flex: 1 1 0;
+    font-size: 0.82rem;
+    padding: 6px 10px;
+    white-space: nowrap;
+    text-align: center;
 }
 
 .sk_al_list {
@@ -979,11 +982,15 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_color_c
 
 .sk_al_footer {
     display: flex;
-    justify-content: flex-end;
     gap: 8px;
     padding: 12px 18px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(0, 0, 0, 0.15);
+}
+.sk_al_footer .menu_button {
+    flex: 1 1 0;
+    white-space: nowrap;
+    text-align: center;
 }
 .sk_al_confirm {
     background: rgba(255, 100, 100, 0.85) !important;
