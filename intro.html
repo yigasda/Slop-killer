@@ -299,7 +299,6 @@
             order: 3;
             margin: 0 0 0 56px;
         }
-        .detail-body { padding: 24px 26px 28px; }
     }
 </style>
 </head>
@@ -326,7 +325,7 @@
             <h2>이런 경험, 있으시죠?</h2>
             <p>모델은 마음에 든 표현을 메시지마다 똑같이 반복합니다. 한 번 눈에 띄면 계속 거슬리죠.</p>
         </div>
-        <div class="quote-card">
+        <div class="quote-card" style="padding: 30px 32px;">
             <div class="label">매 답변마다 등장하는 그 문장…</div>
             <div class="line">"<span class="hl">허리를 감싸 안으며</span>, 그는 나를 끌어당겼다."</div>
             <div class="line">"<span class="hl">허리를 감싸 안으며</span>, 그가 속삭였다."</div>
@@ -344,42 +343,42 @@
             <p>반복을 찾는 것에서 그치지 않고, 막고 고치는 것까지 자동으로 처리합니다.</p>
         </div>
         <div class="grid">
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🔍</div>
                 <h3>반복 표현 자동 감지</h3>
                 <p>최근 대화를 훑어 자주 등장한 표현을 빈도순으로 정리해 보여줍니다. 한국어 조사·어미까지 이해합니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🚫</div>
                 <h3>금지어 · 허용어 관리</h3>
                 <p>거슬리는 표현은 금지어로, 괜찮은 표현은 허용어로. 캐릭터별 + 전체 공통 두 단계로 관리합니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🔄</div>
                 <h3>자동 리롤 (재작성)</h3>
                 <p>금지어가 답변에 나오면, 그 문장만 골라 같은 의미·감정으로 자연스럽게 다시 써 줍니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">💉</div>
                 <h3>프롬프트 주입</h3>
                 <p>생성 직전 "이 표현은 쓰지 마"라는 안내를 모델에게 몰래 끼워 넣어 애초에 반복을 줄입니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">📉</div>
                 <h3>반복 페널티 자동 조절</h3>
                 <p>OpenAI 호환 백엔드에서 frequency / presence penalty를 상황에 맞춰 올려 줍니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">💡</div>
                 <h3>자동 학습</h3>
                 <p>하나를 차단하면, 단어를 공유하는 비슷한 우회 표현들을 찾아 같이 막을지 물어봅니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🖍️</div>
                 <h3>채팅 하이라이트</h3>
                 <p>반복된 표현을 대화창에서 물결 밑줄로 색칠해 한눈에 보이게 합니다.</p>
             </div>
-            <div class="feature">
+            <div class="feature" style="padding: 28px 28px;">
                 <div class="ico">🎨</div>
                 <h3>4가지 테마</h3>
                 <p>Mono · Rose · Ivory · Sky. 취향에 맞는 색감으로 설정 패널을 꾸밀 수 있습니다.</p>
@@ -407,7 +406,7 @@
                     <h3>반복 표현 자동 감지</h3>
                     <span class="tag">감지 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         최근 AI 메시지들을 자동으로 스캔해서, 여러 번 등장한 <b>n-그램(연속된 단어 묶음)</b>을
                         빈도순으로 정리해 보여 줍니다. 어떤 표현이 몇 번 나왔는지 한눈에 확인하고, 바로
@@ -434,7 +433,7 @@
                     <h3>금지어 · 허용어 관리</h3>
                     <span class="tag">금지어 · 글로벌 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         표현을 두 가지로 분류합니다. <b>금지어</b>는 절대 나오면 안 되는 표현으로,
                         자동 리롤·페널티·하이라이트의 대상이 됩니다. <b>허용어</b>는 "이건 반복이어도 괜찮아"라고
@@ -460,7 +459,7 @@
                     <h3>자동 리롤 — 문장만 골라 다시 쓰기</h3>
                     <span class="tag">간판 기능</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         이 확장의 핵심 기능입니다. 등록한 금지어가 답변에 등장하면, <b>그 표현이 들어 있는 문장만</b>
                         따로 떼어 모델에게 다시 요청합니다. 같은 의미·감정·분량은 그대로 유지하되 금지 표현만 빠지도록
@@ -497,7 +496,7 @@
                     <h3>프롬프트 주입 — 애초에 반복 막기</h3>
                     <span class="tag">설정 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         생성이 시작되기 직전, "다음 표현은 쓰지 말라"는 <b>시스템 안내문</b>을 대화에 몰래 끼워 넣습니다.
                         모델이 답변을 만들기 전에 미리 주의를 받으므로, 반복이 나오기 전에 예방할 수 있습니다.
@@ -523,7 +522,7 @@
                     <h3>반복 페널티 자동 조절</h3>
                     <span class="tag">설정 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         반복이 감지되면 모델의 <b>frequency penalty</b>와 <b>presence penalty</b>를 자동으로 살짝 올려,
                         같은 단어를 덜 쓰도록 유도합니다. 생성이 끝나면 원래 값으로 되돌려 놓습니다.
@@ -547,7 +546,7 @@
                     <h3>자동 학습 — 우회 변형까지 한 번에</h3>
                     <span class="tag">설정 탭 · 기본 꺼짐</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         금지어를 하나 추가하면, 채팅 안에서 <b>그 단어를 공유하는 비슷한 표현</b>들을 찾아
                         "이것들도 같이 막을까요?"라고 물어봅니다. 모델이 금지어를 살짝 바꿔 빠져나가는
@@ -579,7 +578,7 @@
                     <h3>채팅 하이라이트</h3>
                     <span class="tag">설정 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         반복된 표현을 대화창에서 <span class="hl">물결 밑줄 + 색칠</span>로 표시합니다.
                         금지어와 반복 기준을 넘은 표현이 모두 대상이라, 어디서 반복이 일어나는지 즉시 알아챌 수 있습니다.
@@ -599,7 +598,7 @@
                     <h3>감지 프리셋 · 불용어</h3>
                     <span class="tag">감지 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         감지 설정을 상황에 맞게 저장해 두고 빠르게 전환할 수 있습니다. 자주 쓰는 단어는
                         감지에서 아예 제외할 수도 있습니다.
@@ -619,7 +618,7 @@
                     <h3>테마 · 진입 방법</h3>
                     <span class="tag">설정 탭</span>
                 </div>
-                <div class="detail-body">
+                <div class="detail-body" style="padding: 26px 30px 30px; word-break: keep-all;">
                     <p>
                         설정 패널은 4가지 테마(Mono · Rose · Ivory · Sky)로 꾸밀 수 있고, 마술봉(확장) 메뉴에서 언제든 열 수 있습니다.
                     </p>
@@ -645,21 +644,21 @@
             <p>SillyTavern 확장 설치 메뉴에 주소만 붙여 넣으면 끝.</p>
         </div>
         <div class="steps">
-            <div class="step">
+            <div class="step" style="padding: 20px 24px;">
                 <div class="s-num">1</div>
                 <div class="s-body">
                     <h4>확장 메뉴 열기</h4>
                     <p>SillyTavern 상단의 확장(블록 모양) 아이콘 → <b>Install extension</b>을 누릅니다.</p>
                 </div>
             </div>
-            <div class="step">
+            <div class="step" style="padding: 20px 24px;">
                 <div class="s-num">2</div>
                 <div class="s-body">
                     <h4>저장소 주소 붙여넣기</h4>
                     <p>이 확장의 Git 주소를 입력하고 설치합니다. 설치 후 자동으로 활성화됩니다.</p>
                 </div>
             </div>
-            <div class="step">
+            <div class="step" style="padding: 20px 24px;">
                 <div class="s-num">3</div>
                 <div class="s-body">
                     <h4>마술봉에서 열기</h4>
