@@ -1330,6 +1330,15 @@ function buildPanel() {
                     <hr>
                     <h4><i class="fa-solid fa-circle-check sk_h4_icon"></i>허용어 (반복 아님)</h4>
                     <div id="sk_allowed_list" class="sk_list"></div>
+
+                    <hr>
+                    <h4><i class="fa-solid fa-file-arrow-down sk_h4_icon"></i>목록 저장 / 불러오기 (캐릭터)</h4>
+                    <p class="sk_hint">현재 캐릭터의 금지어·허용어를 JSON 파일로 내보내거나 가져옵니다. 불러오기는 기존 목록에 병합됩니다.</p>
+                    <div class="sk_io_row">
+                        <button id="sk_char_export" class="menu_button"><i class="fa-solid fa-download"></i> 저장하기</button>
+                        <button id="sk_char_import_btn" class="menu_button"><i class="fa-solid fa-upload"></i> 불러오기</button>
+                        <input id="sk_char_import" type="file" accept=".json" hidden>
+                    </div>
                 </div>
 
                 <!-- 글로벌 -->
@@ -1350,6 +1359,15 @@ function buildPanel() {
                     <h4><i class="fa-solid fa-earth-americas sk_h4_icon"></i>글로벌 허용어</h4>
                     <p class="sk_hint">모든 캐릭터에서 '반복 아님'으로 제외됩니다.</p>
                     <div id="sk_global_allowed_list" class="sk_list"></div>
+
+                    <hr>
+                    <h4><i class="fa-solid fa-file-arrow-down sk_h4_icon"></i>목록 저장 / 불러오기 (글로벌)</h4>
+                    <p class="sk_hint">글로벌 금지어·허용어를 JSON 파일로 내보내거나 가져옵니다. 불러오기는 기존 목록에 병합됩니다.</p>
+                    <div class="sk_io_row">
+                        <button id="sk_global_export" class="menu_button"><i class="fa-solid fa-download"></i> 저장하기</button>
+                        <button id="sk_global_import_btn" class="menu_button"><i class="fa-solid fa-upload"></i> 불러오기</button>
+                        <input id="sk_global_import" type="file" accept=".json" hidden>
+                    </div>
                 </div>
 
                 <!-- 감지 -->
@@ -1402,7 +1420,8 @@ function buildPanel() {
                         <span>사용</span>
                     </label>
                     <label>한 번에 알려줄 표현 — 최대 <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
-                    <input id="sk_maxInject" type="range" min="1" max="40" value="${s.maxInject}" class="sk_slider">
+                    <input id="sk_maxInject" type="range" min="1" max="60" value="${s.maxInject}" class="sk_slider">
+                    <p class="sk_hint">30~40개를 넘어가면 모델이 일부를 무시할 수 있어요. 그럴 땐 자동 리롤 기능을 함께 사용하세요.</p>
                     <label>모델에게 보낼 문구</label>
                     <p class="sk_hint"><code>{{banned}}</code> 자리엔 등록한 금지어, <code>{{slop}}</code> 자리엔 자동으로 찾은 반복 표현, <code>{{phrases}}</code> 자리엔 둘 다. 해당 목록이 비어 있으면 그 줄은 자동 생략됩니다.</p>
                     <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
@@ -1691,6 +1710,84 @@ function bindPanel() {
     const win = document.getElementById(`${MODULE_NAME}_panel`);
     win.querySelector(".sk_window_close")?.addEventListener("click", closeWindow);
     document.getElementById("sk_backdrop")?.addEventListener("click", closeWindow);
+
+    // JSON export/import helpers
+    function downloadJson(data, filename) {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function importIntoList(arr, incoming) {
+        const seen = new Set(arr.map(x => normalizePhrase(x)));
+        for (const raw of incoming) {
+            const p = normalizePhrase(raw);
+            if (p && !seen.has(p)) { seen.add(p); arr.push(p); }
+        }
+    }
+
+    function readImportFile(input, expectedScope, onValid) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                if (data.scope && data.scope !== expectedScope) {
+                    alert(expectedScope === "character"
+                        ? "이 파일은 캐릭터 전용이 아닙니다 (글로벌 파일로 보입니다)."
+                        : "이 파일은 글로벌 전용이 아닙니다 (캐릭터 파일로 보입니다).");
+                } else if (!Array.isArray(data.banned) && !Array.isArray(data.allowed)) {
+                    alert("올바른 형식이 아닙니다. banned / allowed 목록이 필요합니다.");
+                } else {
+                    onValid(data);
+                    save(); renderPanel(); refreshAllHighlights();
+                }
+            } catch { alert("올바른 JSON 파일이 아닙니다."); }
+            input.value = "";
+        };
+        reader.readAsText(file);
+    }
+
+    // Character scope — export
+    document.getElementById("sk_char_export").addEventListener("click", () => {
+        const name = getCurrentCharName();
+        const cd = getCharData(name);
+        const safe = (name || "noname").replace(/[^a-z0-9가-힣]/gi, "_");
+        downloadJson({ scope: "character", name: name || "", banned: cd.banned, allowed: cd.allowed }, `slop-killer-char-${safe}.json`);
+    });
+
+    // Character scope — import (merge)
+    document.getElementById("sk_char_import_btn").addEventListener("click", () => {
+        document.getElementById("sk_char_import").click();
+    });
+    document.getElementById("sk_char_import").addEventListener("change", (e) => {
+        readImportFile(e.target, "character", (data) => {
+            const cd = getCharData(getCurrentCharName());
+            if (Array.isArray(data.banned))  importIntoList(cd.banned,  data.banned);
+            if (Array.isArray(data.allowed)) importIntoList(cd.allowed, data.allowed);
+        });
+    });
+
+    // Global scope — export
+    document.getElementById("sk_global_export").addEventListener("click", () => {
+        const g = getGlobal();
+        downloadJson({ scope: "global", banned: g.banned, allowed: g.allowed }, "slop-killer-global.json");
+    });
+
+    // Global scope — import (merge)
+    document.getElementById("sk_global_import_btn").addEventListener("click", () => {
+        document.getElementById("sk_global_import").click();
+    });
+    document.getElementById("sk_global_import").addEventListener("change", (e) => {
+        readImportFile(e.target, "global", (data) => {
+            const g = getGlobal();
+            if (Array.isArray(data.banned))  importIntoList(g.banned,  data.banned);
+            if (Array.isArray(data.allowed)) importIntoList(g.allowed, data.allowed);
+        });
+    });
 }
 
 function renderPanel() {

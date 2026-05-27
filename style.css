@@ -327,6 +327,18 @@ body[data-sk-theme] #slop_killer_panel hr {
     flex: 1;
 }
 
+/* JSON import/export row */
+.sk_io_row {
+    display: flex;
+    gap: 6px;
+    margin: 4px 0 8px;
+}
+
+.sk_io_row .menu_button {
+    flex: 1;
+    white-space: nowrap;
+}
+
 /* Detect-preset row */
 .sk_preset_row {
     display: flex;
