@@ -56,7 +56,24 @@ let _penaltyRestore = null;
 // Auto-reroll bookkeeping.
 let _rerollBusy = false;            // true while we are driving continue retries
 let _lastFreshId = null;            // id of the most recent freshly-generated reply
+let _rerollTimer = null;            // debounce timer coalescing MESSAGE_RECEIVED + GENERATION_ENDED
 const _rerollCount = new Map();     // mesId -> attempts already spent
+
+// MESSAGE_RECEIVED and GENERATION_ENDED fire in DIFFERENT orders depending on
+// how the reply was produced (fresh turn vs. swipe/regen), so we cannot consume
+// _lastFreshId in one and set it in the other. Instead, both events call this;
+// a debounce waits until generation has settled (the later of the two events,
+// which is always after the generation lock is released) before firing once.
+function queueReroll() {
+    if (_lastFreshId === null) return;
+    clearTimeout(_rerollTimer);
+    _rerollTimer = setTimeout(() => {
+        if (_lastFreshId === null) return;
+        const id = _lastFreshId;
+        _lastFreshId = null;
+        maybeReroll(id);
+    }, 150);
+}
 
 // Search + sort state per scope (persists across re-renders within a session).
 const _filter = {
@@ -1717,14 +1734,12 @@ jQuery(() => {
             // Fresh generation → reset attempt counter so the user gets a full
             // rerollMax budget on every new swipe/regen of this mesId.
             _rerollCount.delete(id);
+            queueReroll();
         });
         eventSource.on(event_types.GENERATION_ENDED, () => {
             restorePenalty();
             console.log(`[SlopKiller] GENERATION_ENDED: _lastFreshId=${_lastFreshId}`);
-            if (_lastFreshId === null) return;
-            const id = _lastFreshId;
-            _lastFreshId = null;
-            setTimeout(() => maybeReroll(id), 0);
+            queueReroll();
         });
 
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (mesId) => {
