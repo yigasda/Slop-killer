@@ -2,7 +2,6 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI 반복 킬러 · Slop Killer</title>
 <style>
     :root {
@@ -14,7 +13,6 @@
         --rose:      #e6739a;
         --rose-deep: #c8527e;
         --gold:      #c2ad7e;
-        --sky:       #5b8def;
         --hl:        #ff6b6b;
         --line:      rgba(110, 42, 62, 0.10);
         --shadow:    0 8px 30px rgba(180, 90, 120, 0.10);
@@ -25,8 +23,6 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html { scroll-behavior: smooth; }
-
     body {
         font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR",
                      -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -34,7 +30,6 @@
         color: var(--ink);
         line-height: 1.7;
         -webkit-font-smoothing: antialiased;
-        overflow-x: hidden;
     }
 
     .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
@@ -52,30 +47,11 @@
 
     /* ===== Hero ===== */
     header.hero {
-        position: relative;
         text-align: center;
-        padding: 100px 24px 80px;
+        padding: 60px 24px 44px;
         background:
-            radial-gradient(1200px 400px at 50% -120px, #ffe3ec 0%, transparent 70%),
+            radial-gradient(1200px 360px at 50% -120px, #ffe3ec 0%, transparent 70%),
             linear-gradient(180deg, #fff0ef 0%, var(--bg) 100%);
-        overflow: hidden;
-    }
-    .hero::before, .hero::after {
-        content: "";
-        position: absolute;
-        border-radius: 50%;
-        filter: blur(8px);
-        opacity: 0.5;
-    }
-    .hero::before {
-        width: 220px; height: 220px;
-        background: radial-gradient(circle, #ffc6d6 0%, transparent 70%);
-        top: -40px; left: -60px;
-    }
-    .hero::after {
-        width: 280px; height: 280px;
-        background: radial-gradient(circle, #d6e4ff 0%, transparent 70%);
-        bottom: -80px; right: -80px;
     }
 
     .badge {
@@ -91,9 +67,7 @@
         padding: 7px 16px;
         border-radius: 999px;
         box-shadow: var(--shadow-sm);
-        margin-bottom: 28px;
-        position: relative;
-        z-index: 1;
+        margin-bottom: 24px;
     }
     .badge .dot {
         width: 8px; height: 8px; border-radius: 50%;
@@ -106,8 +80,6 @@
         font-weight: 800;
         letter-spacing: -0.02em;
         line-height: 1.1;
-        position: relative;
-        z-index: 1;
     }
     .hero h1 .en {
         display: block;
@@ -122,60 +94,23 @@
         font-size: clamp(1.05rem, 2.2vw, 1.25rem);
         color: var(--ink-soft);
         max-width: 620px;
-        margin: 28px auto 0;
-        position: relative;
-        z-index: 1;
+        margin: 24px auto 0;
     }
-
-    .hero .cta {
-        margin-top: 40px;
-        display: flex;
-        gap: 14px;
-        justify-content: center;
-        flex-wrap: wrap;
-        position: relative;
-        z-index: 1;
-    }
-    .btn {
-        font-family: inherit;
-        font-size: 0.98rem;
-        font-weight: 600;
-        padding: 13px 28px;
-        border-radius: 999px;
-        border: none;
-        cursor: pointer;
-        text-decoration: none;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-        display: inline-block;
-    }
-    .btn-primary {
-        background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
-        color: #fff;
-        box-shadow: 0 6px 20px rgba(200, 82, 126, 0.35);
-    }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(200, 82, 126, 0.42); }
-    .btn-ghost {
-        background: #fff;
-        color: var(--rose-deep);
-        border: 1px solid var(--line);
-        box-shadow: var(--shadow-sm);
-    }
-    .btn-ghost:hover { transform: translateY(-2px); }
 
     /* ===== Section scaffolding ===== */
-    section { padding: 72px 0; }
-    .section-head { text-align: center; margin-bottom: 52px; }
+    section { padding: 44px 0; }
+    .section-head { text-align: center; margin-bottom: 30px; }
     .section-head .kicker {
         font-size: 0.82rem; font-weight: 700; letter-spacing: 0.12em;
         text-transform: uppercase; color: var(--rose);
-        margin-bottom: 12px;
+        margin-bottom: 10px;
     }
     .section-head h2 {
         font-size: clamp(1.7rem, 4vw, 2.3rem);
         font-weight: 800; letter-spacing: -0.01em;
     }
     .section-head p {
-        color: var(--ink-soft); max-width: 560px; margin: 14px auto 0;
+        color: var(--ink-soft); max-width: 560px; margin: 12px auto 0;
         font-size: 1.02rem;
     }
 
@@ -188,32 +123,31 @@
     .quote-card {
         background: var(--card);
         border-radius: var(--r-lg);
-        padding: 38px 40px;
+        padding: 32px 36px;
         box-shadow: var(--shadow);
         max-width: 720px;
         margin: 0 auto;
-        position: relative;
     }
     .quote-card .label {
         font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em;
-        color: var(--ink-soft); text-transform: uppercase; margin-bottom: 16px;
+        color: var(--ink-soft); text-transform: uppercase; margin-bottom: 14px;
     }
     .quote-card .line {
         font-size: 1.12rem; line-height: 1.9; color: var(--ink);
     }
-    .quote-card .line + .line { margin-top: 10px; }
+    .quote-card .line + .line { margin-top: 8px; }
 
     /* ===== Feature grid ===== */
     .grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 20px;
+        gap: 18px;
     }
     .feature {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: var(--r-lg);
-        padding: 30px 28px;
+        padding: 28px 26px;
         box-shadow: var(--shadow-sm);
         transition: transform 0.18s ease, box-shadow 0.18s ease;
     }
@@ -223,26 +157,27 @@
         display: flex; align-items: center; justify-content: center;
         border-radius: 16px;
         font-size: 1.5rem;
-        margin-bottom: 18px;
+        margin-bottom: 16px;
         background: linear-gradient(135deg, #ffe3ec, #ffd0de);
     }
-    .feature h3 { font-size: 1.18rem; font-weight: 700; margin-bottom: 10px; }
+    .feature h3 { font-size: 1.18rem; font-weight: 700; margin-bottom: 8px; }
     .feature p { color: var(--ink-soft); font-size: 0.96rem; }
 
     /* ===== Detailed sections (deep dive) ===== */
-    .deep { display: flex; flex-direction: column; gap: 26px; }
+    .deep { display: flex; flex-direction: column; gap: 18px; }
     .detail {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: var(--r-lg);
-        overflow: hidden;
         box-shadow: var(--shadow-sm);
     }
     .detail-head {
         display: flex; align-items: center; gap: 16px;
-        padding: 26px 30px;
+        padding: 22px 28px;
         background: linear-gradient(180deg, #fff6f8, #ffffff);
         border-bottom: 1px solid var(--line);
+        border-top-left-radius: var(--r-lg);
+        border-top-right-radius: var(--r-lg);
     }
     .detail-head .num {
         flex-shrink: 0;
@@ -262,11 +197,11 @@
         padding: 5px 12px; border-radius: 999px;
         white-space: nowrap;
     }
-    .detail-body { padding: 26px 30px 30px; }
-    .detail-body > p { color: var(--ink); margin-bottom: 16px; }
+    .detail-body { padding: 22px 28px 26px; }
+    .detail-body > p { color: var(--ink); margin-bottom: 14px; }
     .detail-body > p:last-child { margin-bottom: 0; }
 
-    ul.ticks { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+    ul.ticks { list-style: none; display: flex; flex-direction: column; gap: 10px; }
     ul.ticks li { position: relative; padding-left: 30px; color: var(--ink); }
     ul.ticks li::before {
         content: "✓";
@@ -281,7 +216,7 @@
     ul.ticks li b { color: var(--rose-deep); }
 
     .note {
-        margin-top: 18px;
+        margin-top: 16px;
         background: #fff8f0;
         border: 1px solid #f0e2cf;
         border-left: 4px solid var(--gold);
@@ -292,7 +227,7 @@
     }
     .note b { color: #9c7e3f; }
 
-    code, .mono {
+    code {
         font-family: "SFMono-Regular", "Consolas", "Menlo", monospace;
         font-size: 0.88em;
         background: #fbeef1;
@@ -328,49 +263,14 @@
         .ba-arrow { transform: rotate(90deg); }
     }
 
-    /* ===== Themes ===== */
-    .themes { background: var(--bg-soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .theme-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 18px;
-    }
-    .theme-card {
-        border-radius: var(--r-lg);
-        overflow: hidden;
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--line);
-        transition: transform 0.18s ease;
-    }
-    .theme-card:hover { transform: translateY(-4px); }
-    .theme-swatch { height: 96px; position: relative; }
-    .theme-swatch .dot {
-        position: absolute; bottom: 14px; left: 16px;
-        width: 30px; height: 30px; border-radius: 50%;
-        border: 3px solid #fff;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    }
-    .theme-meta { padding: 14px 18px; background: #fff; }
-    .theme-meta .t-name { font-weight: 700; }
-    .theme-meta .t-sub { font-size: 0.85rem; color: var(--ink-soft); }
-
-    .t-mono  { background: linear-gradient(135deg, #f4f4f6, #e2e4ea); }
-    .t-mono  .dot { background: #111; }
-    .t-rose  { background: linear-gradient(135deg, #fff5f7, #ffd9e3); }
-    .t-rose  .dot { background: #e6739a; }
-    .t-ivory { background: linear-gradient(135deg, #fdfcf5, #efe6c8); }
-    .t-ivory .dot { background: #c2ad7e; }
-    .t-sky   { background: linear-gradient(135deg, #f3f8ff, #cfe1ff); }
-    .t-sky   .dot { background: #5b8def; }
-
     /* ===== Install ===== */
-    .steps { display: flex; flex-direction: column; gap: 16px; max-width: 680px; margin: 0 auto; }
+    .steps { display: flex; flex-direction: column; gap: 14px; max-width: 680px; margin: 0 auto; }
     .step {
         display: flex; gap: 18px; align-items: flex-start;
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: var(--r);
-        padding: 22px 24px;
+        padding: 20px 24px;
         box-shadow: var(--shadow-sm);
     }
     .step .s-num {
@@ -388,7 +288,7 @@
     /* ===== Footer ===== */
     footer {
         text-align: center;
-        padding: 60px 24px 70px;
+        padding: 44px 24px 52px;
         color: var(--ink-soft);
         font-size: 0.9rem;
     }
@@ -397,8 +297,6 @@
         margin-bottom: 8px;
     }
     footer .meta { font-size: 0.84rem; opacity: 0.8; }
-
-    .divider-emoji { text-align:center; font-size: 1.4rem; opacity: 0.4; margin: 0; padding: 8px 0; }
 </style>
 </head>
 <body>
@@ -414,10 +312,6 @@
         AI가 입버릇처럼 되풀이하는 <span class="hl">똑같은 표현</span>을 찾아내고, 막고,
         자연스럽게 다시 써 줍니다. 롤플레이의 몰입을 깨는 반복을 끝내세요.
     </p>
-    <div class="cta">
-        <a href="#features" class="btn btn-primary">기능 둘러보기</a>
-        <a href="#install" class="btn btn-ghost">설치 방법</a>
-    </div>
 </header>
 
 <!-- ===================== PROBLEM ===================== -->
@@ -722,7 +616,7 @@
                 </div>
                 <div class="detail-body">
                     <p>
-                        설정 패널은 4가지 테마로 꾸밀 수 있고, 마술봉(확장) 메뉴에서 언제든 열 수 있습니다.
+                        설정 패널은 4가지 테마(Mono · Rose · Ivory · Sky)로 꾸밀 수 있고, 마술봉(확장) 메뉴에서 언제든 열 수 있습니다.
                     </p>
                     <ul class="ticks">
                         <li><b>마술봉 메뉴</b>의 빗자루(🧹) 아이콘 → "AI 반복 킬러"를 누르면 설정 창이 열립니다.</li>
@@ -732,35 +626,6 @@
                 </div>
             </div>
 
-        </div>
-    </div>
-</section>
-
-<!-- ===================== THEMES ===================== -->
-<section class="themes">
-    <div class="wrap">
-        <div class="section-head">
-            <div class="kicker">테마</div>
-            <h2>취향대로 고르는 4가지 색감</h2>
-            <p>설정 패널과 모든 팝업에 일관되게 적용됩니다.</p>
-        </div>
-        <div class="theme-row">
-            <div class="theme-card">
-                <div class="theme-swatch t-mono"><div class="dot"></div></div>
-                <div class="theme-meta"><div class="t-name">Mono</div><div class="t-sub">흑백 · 미니멀</div></div>
-            </div>
-            <div class="theme-card">
-                <div class="theme-swatch t-rose"><div class="dot"></div></div>
-                <div class="theme-meta"><div class="t-name">Rose</div><div class="t-sub">파스텔 핑크</div></div>
-            </div>
-            <div class="theme-card">
-                <div class="theme-swatch t-ivory"><div class="dot"></div></div>
-                <div class="theme-meta"><div class="t-name">Ivory</div><div class="t-sub">크림 · 골드</div></div>
-            </div>
-            <div class="theme-card">
-                <div class="theme-swatch t-sky"><div class="dot"></div></div>
-                <div class="theme-meta"><div class="t-name">Sky</div><div class="t-sub">라이트 블루</div></div>
-            </div>
         </div>
     </div>
 </section>
