@@ -1321,6 +1321,7 @@ function buildPanel() {
                         <input id="sk_ban_input" type="text" class="text_pole" placeholder="금지할 표현 입력">
                         <button id="sk_ban_add" class="menu_button">추가</button>
                     </div>
+                    <button id="sk_ban_add_sel" class="menu_button sk_sel_add_btn" title="채팅에서 드래그로 선택한 문구를 금지어로 추가"><i class="fa-solid fa-i-cursor"></i> 선택한 문구 추가</button>
                     <div id="sk_char_banned_filter" class="sk_filter" hidden>
                         <input id="sk_char_banned_search" type="text" class="text_pole sk_search" placeholder="검색">
                         <select id="sk_char_banned_sort" class="text_pole sk_sort">${SORT_OPTIONS}</select>
@@ -1671,6 +1672,16 @@ function bindPanel() {
     document.getElementById("sk_ban_add").addEventListener("click", doAddChar);
     banInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAddChar(); });
 
+    // 채팅에서 선택한 문구 추가
+    document.getElementById("sk_ban_add_sel").addEventListener("click", () => {
+        if (_lastSelectedPhrase) {
+            addBanned(_lastSelectedPhrase);
+            showCtxToast(`"${_lastSelectedPhrase}" 추가됨`);
+        } else {
+            toastr?.info?.("채팅에서 문구를 먼저 드래그로 선택하세요");
+        }
+    });
+
     // Global-scope ban input
     const globalBanInput = document.getElementById("sk_global_ban_input");
     const doAddGlobal = () => {
@@ -1886,6 +1897,7 @@ function renderChipBox(id, list, kind, scope, filter) {
 // Chat context-menu — right-click (PC) or tap on highlight (mobile)
 // ====================================================================
 let _ctxMenu = null;
+let _lastSelectedPhrase = "";
 
 function showCtxMenu(x, y, phrase) {
     hideCtxMenu();
@@ -1953,29 +1965,19 @@ function initChatContextMenu() {
         if (phrase) showCtxMenu(e.clientX, e.clientY, phrase);
     });
 
-    // 드래그/터치 선택 후 손·마우스 뗐을 때 → 팝업 (네이티브 복사창과 공존)
-    function onPointerUp(e) {
-        const delay = e.type === "touchend" ? 50 : 0;
-        setTimeout(() => {
-            const sel = window.getSelection();
-            const text = sel?.toString().trim().replace(/\s+/g, " ") ?? "";
-            if (!text || text.length > 120) return;
-            const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-            if (!range) return;
-            const node = range.commonAncestorContainer;
-            const mes = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)
-                ?.closest?.(".mes");
-            if (!mes || mes.getAttribute("is_user") === "true") return;
-            const rect = range.getBoundingClientRect();
-            showCtxMenu(
-                Math.round((rect.left + rect.right) / 2),
-                Math.round(rect.bottom),
-                text
-            );
-        }, delay);
-    }
-    chat.addEventListener("mouseup", onPointerUp);
-    chat.addEventListener("touchend", onPointerUp, { passive: true });
+    // 채팅에서 선택한 문구를 조용히 기억 (팝업 X, 다른 확장·네이티브 복사와 충돌 없음)
+    document.addEventListener("selectionchange", () => {
+        const sel = window.getSelection();
+        const text = sel?.toString().trim().replace(/\s+/g, " ") ?? "";
+        if (!text || text.length > 120) return;   // 빈 선택은 무시 → 직전 값 유지
+        const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+        if (!range) return;
+        const node = range.commonAncestorContainer;
+        const mes = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)
+            ?.closest?.(".mes");
+        if (!mes || mes.getAttribute("is_user") === "true") return;
+        _lastSelectedPhrase = text;
+    });
 
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideCtxMenu(); });
 }

@@ -327,6 +327,11 @@ body[data-sk-theme] #slop_killer_panel hr {
     flex: 1;
 }
 
+.sk_sel_add_btn {
+    width: 100%;
+    margin: 0 0 8px;
+}
+
 /* JSON import/export row */
 .sk_io_row {
     display: flex;
