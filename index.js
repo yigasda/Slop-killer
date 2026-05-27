@@ -521,26 +521,39 @@ function expandBoundsForAllBanned(text, phrases, initialBounds) {
 }
 
 function buildRewritePrompt(before, target, after, phrases) {
-    const ctxBefore = before.slice(-600).trim();
-    const ctxAfter = after.slice(0, 600).trim();
+    const ctxBefore = before.slice(-300).trim().replace(/[\r\n]+/g, " ");
     const banList = phrases.map(p => `"${p}"`).join(", ");
+    const targetLine = target.trim().replace(/[\r\n]+/g, " ");
+    // Short, direct English prompt. Long multi-section Korean prompts get
+    // misread as RP speech by many models (esp. Gemini) — they reply with
+    // greetings instead of editing. English with explicit "Output ONLY" works.
     return [
-        "당신은 진행 중인 롤플레이 응답의 한 구간을 다시 쓰고 있습니다.",
-        "다른 화자나 메타 코멘트를 넣지 말고, 같은 문체·시점·언어로 자연스럽게 이어지게 쓰세요.",
+        "You are a text editor, not a chatbot or roleplay character.",
+        `Task: rewrite the PASSAGE below so it does NOT contain ${banList}.`,
+        "Rules:",
+        "- Keep the same language as the passage (do NOT translate).",
+        "- Keep the same tone, style, and approximate length.",
+        "- Preserve the meaning; replace the banned phrase with a natural synonym or rephrasing.",
+        "- Output ONLY the rewritten passage. No greeting, no explanation, no quotes, no labels.",
         "",
-        "[앞 문맥]",
-        ctxBefore || "(없음)",
-        "",
-        "[원본 — 이 부분만 다시 씁니다]",
-        target.trim(),
-        "",
-        "[뒤 문맥]",
-        ctxAfter || "(없음)",
-        "",
-        `다음 표현은 절대 사용 금지: ${banList}.`,
-        "원본과 비슷한 길이로, 같은 의미·흐름을 유지하면서 금지 표현 없이 다시 쓰세요.",
-        "설명·서두·따옴표 없이 새 본문만 출력하세요.",
-    ].join("\n");
+        ctxBefore ? `CONTEXT (do not rewrite, for reference only):\n${ctxBefore}\n` : "",
+        `PASSAGE TO REWRITE:\n${targetLine}`,
+    ].filter(Boolean).join("\n");
+}
+
+// Heuristic: did the model bail out and produce a generic greeting / refusal
+// instead of an edit? Reject so we don't splice nonsense into the message.
+function looksLikeGreetingOrRefusal(text) {
+    const t = text.toLowerCase().trim();
+    if (!t) return true;
+    const bad = [
+        "hello!", "hi!", "hey!", "we're starting fresh", "starting fresh",
+        "how can i help", "how may i help", "what would you like",
+        "i'm sorry", "i cannot", "i can't", "as an ai",
+        "안녕하세요", "안녕!", "무엇을 도와", "어떻게 도와",
+        "죄송합니다", "할 수 없",
+    ];
+    return bad.some(p => t.startsWith(p) || (t.length < 200 && t.includes(p)));
 }
 
 async function rerollSurgically(c, mesId, phrases) {
@@ -557,44 +570,51 @@ async function rerollSurgically(c, mesId, phrases) {
     const after = text.slice(end);
     if (!target.trim()) return false;
 
-    const banList = phrases.map(p => `"${p}"`).join(", ");
-    // One-line prompt in English: simple enough to survive any escaping, short enough
-    // that the model responds with just the rewritten sentence.
-    const ctxSnippet = before.slice(-120).trim().replace(/[\r\n]+/g, " ");
     const targetOneLine = target.trim().replace(/[\r\n]+/g, " ");
-    // Stored in a global so /genraw can read it without escaping issues.
-    globalThis._sk_genraw_prompt =
-        `[DO NOT ROLEPLAY] You are editing a text file. ` +
-        `Rewrite the following passage so it does NOT contain ${banList}. ` +
-        `Keep the same language, style, tone, and approximate length. ` +
-        `Output ONLY the rewritten passage, no explanation, no quotes.\n` +
-        (ctxSnippet ? `Context before: ${ctxSnippet}\n` : "") +
-        `Passage: ${targetOneLine}`;
-
+    const prompt = buildRewritePrompt(before, target, after, phrases);
     console.log(`[SlopKiller] 교체 대상 문장: "${targetOneLine.slice(0, 80)}..."`);
 
-    let raw = "";
-    const execSlash = globalThis.executeSlashCommandsWithOptions ?? globalThis.executeSlashCommands;
-    if (!execSlash) { console.error("[SlopKiller] no generation API found"); return false; }
+    // Roughly 1 token per ~2 chars for mixed CJK/English; cap so the model can't
+    // ramble on into a full RP response.
+    const responseLength = Math.max(120, Math.min(800, Math.ceil(target.length * 2)));
 
+    let raw = "";
     try {
-        // /genraw reads from the global var via STScript macro — avoids escaping issues.
-        const result = await execSlash(`/genraw {{getglobalvar::_sk_genraw_prompt}}`);
-        raw = (result && (result.pipe ?? result)) ?? "";
-        console.log(`[SlopKiller] /genraw 결과 (앞 80자): "${String(raw).slice(0, 80)}"`);
+        const quiet = c.generateQuietPrompt ?? globalThis.generateQuietPrompt;
+        console.log(`[SlopKiller] generateQuietPrompt 유형: ${typeof quiet}, responseLength=${responseLength}`);
+        if (typeof quiet !== "function") {
+            console.error("[SlopKiller] generateQuietPrompt 없음");
+            return false;
+        }
+        // (quietPrompt, quietToLoud=false, skipWIAN=true, quietImage=null, quietName, responseLength)
+        // skipWIAN=true so WI/character cards/author's note don't leak in and pull the model into RP mode.
+        raw = await quiet(prompt, false, true, null, "SlopKillerEditor", responseLength);
     } catch (err) {
-        console.error("[SlopKiller] /genraw 오류:", err);
+        console.error("[SlopKiller] generateQuietPrompt 오류:", err);
         return false;
-    } finally {
-        delete globalThis._sk_genraw_prompt;
     }
+    console.log(`[SlopKiller] 모델 응답 (앞 120자): "${String(raw).slice(0, 120).replace(/\n/g, " ")}"`);
+
     let replacement = String(raw).trim();
-    if (!replacement) return false;
-    // Strip wrapping quotes if the model added them.
+    if (!replacement) { console.warn("[SlopKiller] 빈 응답"); return false; }
+    // Strip wrapping quotes / markdown fences if the model added them.
     replacement = replacement.replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
+    replacement = replacement.replace(/^```[\w]*\n?/i, "").replace(/\n?```$/i, "").trim();
     if (!replacement) return false;
-    // Bail if the model echoed a banned phrase right back at us.
-    if (earliestBannedPos(replacement, phrases) >= 0) return false;
+    // Reject obvious greeting/refusal/RP-mode outputs.
+    if (looksLikeGreetingOrRefusal(replacement)) {
+        console.warn("[SlopKiller] 모델이 챗봇/RP 모드로 응답함 — 폐기");
+        return false;
+    }
+    if (earliestBannedPos(replacement, phrases) >= 0) {
+        console.warn("[SlopKiller] 응답에 금지 표현이 그대로 있음 — 폐기");
+        return false;
+    }
+    // Length sanity check.
+    if (replacement.length > target.length * 5 + 200) {
+        console.warn(`[SlopKiller] 응답이 원본보다 너무 김 (원본 ${target.length}자, 응답 ${replacement.length}자) — 폐기`);
+        return false;
+    }
 
     const needsLeadingSpace = before.length && !/\s$/.test(before) && !/^\s/.test(replacement);
     const needsTrailingSpace = after.length && !/^\s/.test(after) && !/\s$/.test(replacement);
