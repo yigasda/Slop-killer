@@ -36,7 +36,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     penaltyBoost: 0.3,  // added to freq/pres penalty on OpenAI-compatible backends
     autoReroll: true,   // re-generate (via continue) when a banned phrase appears
     rerollMax: 3,       // max continue attempts per message
-    autoLearnEnabled: true,    // after manual ban, suggest similar n-grams found in chat
+    autoLearnEnabled: false,   // after manual ban, suggest similar n-grams found in chat
     rewriteMode: "rewrite",
     characters: {},     // charName -> { banned: [], allowed: [] }
     global: { banned: [], allowed: [] },   // applied across every character
@@ -1052,6 +1052,7 @@ function findSimilarPhrases(bannedPhrase) {
         // Same-length only — different-length n-grams aren't meaningful "variants",
         // and a shorter subset would be redundant under the suffix-tolerant regex.
         if (keyWords.length !== bannedTokens.length) continue;
+        if (count < 2) continue;   // ignore phrases that appear only once
         let overlap = 0;
         for (const w of keyWords) if (bannedSet.has(w)) overlap++;
         if (overlap >= 1) candidates.push({ phrase: key, count, overlap });
@@ -1418,14 +1419,6 @@ function buildPanel() {
                     <input id="sk_penaltyBoost" type="range" min="0.1" max="1.0" step="0.1" value="${s.penaltyBoost}" class="sk_slider">
 
                     <hr>
-                    <h4><i class="fa-solid fa-lightbulb sk_h4_icon"></i>자동 학습</h4>
-                    <label class="checkbox_label">
-                        <input id="sk_autoLearnEnabled" type="checkbox" ${s.autoLearnEnabled ? "checked" : ""}>
-                        <span>금지어 추가 시 비슷한 표현 자동 추천</span>
-                    </label>
-                    <p class="sk_hint">금지어를 추가하면, 채팅 안에서 그 단어를 공유하는 비슷한 표현을 찾아서 같이 차단할지 물어봅니다. AI의 우회 변형을 한 번에 잡을 수 있습니다.</p>
-
-                    <hr>
                     <h4><i class="fa-solid fa-arrows-rotate sk_h4_icon"></i>중복 표현 자동 리롤</h4>
                     <label class="checkbox_label">
                         <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
@@ -1434,6 +1427,14 @@ function buildPanel() {
                     <p class="sk_hint">금지 표현이 든 <b>문장만</b> 별도로 모델에 요청해 같은 의미·감정을 유지하면서 자연스럽게 다시 씁니다. 나머지 메시지는 그대로 유지됩니다. (토큰 추가 소모)</p>
                     <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
                     <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
+
+                    <hr>
+                    <h4><i class="fa-solid fa-lightbulb sk_h4_icon"></i>자동 학습</h4>
+                    <label class="checkbox_label">
+                        <input id="sk_autoLearnEnabled" type="checkbox" ${s.autoLearnEnabled ? "checked" : ""}>
+                        <span>금지어 추가 시 비슷한 표현 자동 추천</span>
+                    </label>
+                    <p class="sk_hint">금지어를 추가하면, 채팅 안에서 그 단어를 공유하는 비슷한 표현을 찾아서 같이 차단할지 물어봅니다. AI의 우회 변형을 한 번에 잡을 수 있습니다.</p>
 
                     <hr>
                     <h4><i class="fa-solid fa-highlighter sk_h4_icon"></i>하이라이트</h4>
