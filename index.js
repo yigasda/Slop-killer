@@ -1069,6 +1069,7 @@ function showAutoLearnModal(bannedPhrase, candidates) {
         backdrop.className = "sk_al_backdrop";
         const dlg = document.createElement("div");
         dlg.className = "sk_al_dialog";
+        backdrop.appendChild(dlg);
         dlg.innerHTML = `
             <div class="sk_al_header">
                 <h3><i class="fa-solid fa-lightbulb"></i> 자동 학습 — 비슷한 표현 발견</h3>
@@ -1093,18 +1094,16 @@ function showAutoLearnModal(bannedPhrase, candidates) {
             </div>
         `;
         document.body.appendChild(backdrop);
-        document.body.appendChild(dlg);
 
         const close = (result) => {
             backdrop.remove();
-            dlg.remove();
             document.removeEventListener("keydown", onKey);
             resolve(result);
         };
         const onKey = (e) => { if (e.key === "Escape") close([]); };
         document.addEventListener("keydown", onKey);
 
-        backdrop.addEventListener("click", () => close([]));
+        backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close([]); });
         dlg.querySelector(".sk_al_cancel").addEventListener("click", () => close([]));
         dlg.querySelector(".sk_al_all").addEventListener("click", () =>
             dlg.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = true));

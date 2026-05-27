@@ -857,23 +857,32 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_color_c
 /* ====================================================================
    Auto-learn suggestion modal
    ==================================================================== */
+/* NOTE: same workaround as .sk_backdrop above — a third-party extension puts
+   transform on <html>, making it the containing block for position:fixed.
+   `inset:0` and `top:50%` then resolve against a 0-height ancestor, so the
+   backdrop collapses and the dialog gets pushed above the viewport. Viewport
+   units (vw/vh) bypass the broken containing block. */
 .sk_al_backdrop {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
     background: rgba(0, 0, 0, 0.55);
     z-index: 10010;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4vh 4vw;
+    padding: 4dvh 4vw;
+    box-sizing: border-box;
     animation: sk_al_fade 120ms ease;
 }
 
 .sk_al_dialog {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(540px, 92vw);
-    max-height: 86vh;
-    max-height: 86dvh;
-    z-index: 10011;
+    width: min(540px, 100%);
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     background: var(--SmartThemeBlurTintColor, #2a2a2a);
@@ -890,8 +899,8 @@ body[data-sk-theme]:not([data-sk-theme="system"]) #slop_killer_panel .sk_color_c
     to { opacity: 1; }
 }
 @keyframes sk_al_pop {
-    from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
-    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
 }
 
 .sk_al_header {
