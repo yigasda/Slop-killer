@@ -1886,8 +1886,9 @@ function renderChipBox(id, list, kind, scope, filter) {
 // Chat context-menu — right-click (PC) or tap on highlight (mobile)
 // ====================================================================
 let _ctxMenu = null;
+let _ctxMode = null;   // "tap" | "sel"
 
-function showCtxMenu(x, y, phrase) {
+function showCtxMenu(x, y, phrase, mode = "tap") {
     hideCtxMenu();
     if (!phrase) return;
 
@@ -1899,6 +1900,7 @@ function showCtxMenu(x, y, phrase) {
     `;
     document.body.appendChild(menu);
     _ctxMenu = menu;
+    _ctxMode = mode;
 
     const vw = window.innerWidth, vh = window.innerHeight;
     const mw = 220, mh = 72;
@@ -1911,14 +1913,18 @@ function showCtxMenu(x, y, phrase) {
         addBanned(phrase);
         showCtxToast(`"${phrase}" 추가됨`);
         hideCtxMenu();
+        window.getSelection()?.removeAllRanges?.();
     });
 
-    setTimeout(() => document.addEventListener("pointerdown", _ctxOutside, { capture: true, once: true }), 0);
+    // 탭 팝업만 바깥클릭으로 닫음. 선택 팝업은 selectionchange가 관리.
+    if (mode === "tap") {
+        setTimeout(() => document.addEventListener("pointerdown", _ctxOutside, { capture: true, once: true }), 0);
+    }
 }
 
 function _ctxOutside(e) { if (!_ctxMenu?.contains(e.target)) hideCtxMenu(); }
 
-function hideCtxMenu() { _ctxMenu?.remove(); _ctxMenu = null; }
+function hideCtxMenu() { _ctxMenu?.remove(); _ctxMenu = null; _ctxMode = null; }
 
 function showCtxToast(msg) {
     const t = document.createElement("div");
@@ -1951,6 +1957,33 @@ function initChatContextMenu() {
         if (!mes || mes.getAttribute("is_user") === "true") return;
         const phrase = hl.textContent.trim();
         if (phrase) showCtxMenu(e.clientX, e.clientY, phrase);
+    });
+
+    // 드래그/터치 선택 → 선택 즉시 팝업 (preventDefault 없음 → 네이티브 복사창과 공존)
+    let _selDebounce = null;
+    document.addEventListener("selectionchange", () => {
+        clearTimeout(_selDebounce);
+        _selDebounce = setTimeout(() => {
+            const sel = window.getSelection();
+            const text = sel?.toString().trim().replace(/\s+/g, " ") ?? "";
+            const valid = text && text.length <= 120;
+            const range = (valid && sel.rangeCount > 0) ? sel.getRangeAt(0) : null;
+            const node = range?.commonAncestorContainer;
+            const mes = node
+                ? (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)?.closest?.(".mes")
+                : null;
+            if (!range || !mes || mes.getAttribute("is_user") === "true") {
+                if (_ctxMode === "sel") hideCtxMenu();   // 선택 팝업만 닫음
+                return;
+            }
+            const rect = range.getBoundingClientRect();
+            showCtxMenu(
+                Math.round((rect.left + rect.right) / 2),
+                Math.round(rect.bottom),
+                text,
+                "sel"
+            );
+        }, 80);
     });
 
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideCtxMenu(); });
