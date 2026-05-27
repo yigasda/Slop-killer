@@ -768,7 +768,11 @@ async function rerollSurgically(c, mesId, phrases) {
     if (pos < 0) return true;                          // nothing to do — success
 
     const initial = sentenceBoundsAt(text, pos);
-    const { start, end } = expandBoundsForAllBanned(text, phrases, initial);
+    // Use the single sentence only — the outer loop handles subsequent occurrences
+    // one at a time. expandBoundsForAllBanned used to grab whole paragraphs when
+    // multiple banned phrases sat nearby, giving the model a huge span to rewrite
+    // and causing sentence-count explosions.
+    const { start, end } = initial;
     const before = text.slice(0, start);
     const target = text.slice(start, end);
     const after = text.slice(end);
