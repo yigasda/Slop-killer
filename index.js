@@ -557,26 +557,36 @@ async function rerollSurgically(c, mesId, phrases) {
     const after = text.slice(end);
     if (!target.trim()) return false;
 
-    console.log(`[SlopKiller] 교체 대상 문장: "${target.trim().slice(0, 80)}..."`);
-    const prompt = buildRewritePrompt(before, target, after, phrases);
+    const banList = phrases.map(p => `"${p}"`).join(", ");
+    // One-line prompt in English: simple enough to survive any escaping, short enough
+    // that the model responds with just the rewritten sentence.
+    const ctxSnippet = before.slice(-120).trim().replace(/[\r\n]+/g, " ");
+    const targetOneLine = target.trim().replace(/[\r\n]+/g, " ");
+    // Stored in a global so /genraw can read it without escaping issues.
+    globalThis._sk_genraw_prompt =
+        `[DO NOT ROLEPLAY] You are editing a text file. ` +
+        `Rewrite the following passage so it does NOT contain ${banList}. ` +
+        `Keep the same language, style, tone, and approximate length. ` +
+        `Output ONLY the rewritten passage, no explanation, no quotes.\n` +
+        (ctxSnippet ? `Context before: ${ctxSnippet}\n` : "") +
+        `Passage: ${targetOneLine}`;
+
+    console.log(`[SlopKiller] 교체 대상 문장: "${targetOneLine.slice(0, 80)}..."`);
+
     let raw = "";
+    const execSlash = globalThis.executeSlashCommandsWithOptions ?? globalThis.executeSlashCommands;
+    if (!execSlash) { console.error("[SlopKiller] no generation API found"); return false; }
+
     try {
-        const quiet = c.generateQuietPrompt ?? globalThis.generateQuietPrompt;
-        console.log(`[SlopKiller] generateQuietPrompt 유형: ${typeof quiet}`);
-        if (typeof quiet === "function") {
-            // generateQuietPrompt(quietPrompt, quietToLoud=false, skipWIAN=false, ...)
-            raw = await quiet(prompt, false, false);
-        } else {
-            const execSlash = globalThis.executeSlashCommandsWithOptions ?? globalThis.executeSlashCommands;
-            if (!execSlash) { console.error("[SlopKiller] no generation API found"); return false; }
-            // Fallback: escape pipes/braces and feed to /genraw via {: :} closure.
-            const safe = prompt.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\{:/g, "\\{:").replace(/:}/g, "\\:}");
-            const result = await execSlash(`/genraw {: ${safe} :}`);
-            raw = (result && (result.pipe ?? result)) ?? "";
-        }
+        // /genraw reads from the global var via STScript macro — avoids escaping issues.
+        const result = await execSlash(`/genraw {{getglobalvar::_sk_genraw_prompt}}`);
+        raw = (result && (result.pipe ?? result)) ?? "";
+        console.log(`[SlopKiller] /genraw 결과 (앞 80자): "${String(raw).slice(0, 80)}"`);
     } catch (err) {
-        console.error("[SlopKiller] generateQuietPrompt failed:", err);
+        console.error("[SlopKiller] /genraw 오류:", err);
         return false;
+    } finally {
+        delete globalThis._sk_genraw_prompt;
     }
     let replacement = String(raw).trim();
     if (!replacement) return false;
