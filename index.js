@@ -309,7 +309,15 @@ function computeCounts() {
             for (let n = s.minN; n <= s.maxN; n++) {
                 for (let i = 0; i + n <= surf.length; i++) {
                     const normGram = norm.slice(i, i + n);
-                    if (normGram.filter(w => isKoContentWord(w, stop)).length < 2) continue;
+                    // Both edges must be content words — otherwise the n-gram
+                    // drags filler in at start/end (e.g. "게 중요한 거지",
+                    // "그리고 당연한 거", "오늘 호텔에서 그").
+                    if (n >= 2) {
+                        if (!isKoContentWord(normGram[0], stop)) continue;
+                        if (!isKoContentWord(normGram[n - 1], stop)) continue;
+                    }
+                    const minContent = n === 1 ? 1 : 2;
+                    if (normGram.filter(w => isKoContentWord(w, stop)).length < minContent) continue;
                     const key = normGram.join(" ");
                     let e = agg.get(key);
                     if (!e) { e = { count: 0, surfaces: new Map() }; agg.set(key, e); }
