@@ -1426,7 +1426,7 @@ function buildPanel() {
                     <p class="sk_hint"><code>{{banned}}</code> 자리엔 등록한 금지어, <code>{{slop}}</code> 자리엔 자동으로 찾은 반복 표현, <code>{{phrases}}</code> 자리엔 둘 다. 해당 목록이 비어 있으면 그 줄은 자동 생략됩니다.</p>
                     <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
                     <button id="sk_injectReset" class="menu_button sk_reset_btn">기본 문구로 복원</button>
-                    <p class="sk_hint"><b style="font-weight:500;opacity:0.75">자동 리롤 관련 명령</b>은 내장된 시스템·유저 프롬프트로 따로 분리되어 있습니다.</p>
+                    <p class="sk_hint"><b>자동 리롤 관련 명령</b>은 내장된 시스템·유저 프롬프트로 따로 분리되어 있습니다.</p>
 
                     <hr>
                     <h4><i class="fa-solid fa-arrows-rotate sk_h4_icon"></i>중복 표현 자동 리롤</h4>
