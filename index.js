@@ -569,10 +569,12 @@ function buildRewritePrompt(before, target, after, phrases) {
     const targetLine = target.trim().replace(/[\r\n]+/g, " ");
     return [
         `Task: rewrite the PASSAGE below so it does NOT contain ${banList}.`,
+        "- Make the SMALLEST change that works. Usually, swapping just the banned phrase for a fitting alternative is enough — only touch neighboring words if grammar requires it.",
+        "- Keep the SAME number of sentences. Do NOT add or remove sentences, and do NOT invent new content or new events.",
         "- Keep the SAME language. Do not translate.",
-        "- Keep the tone, style, voice, and approximate length.",
-        "- You MAY restructure the sentence for natural flow, but keep the original meaning and emotional direction. Do not flip the intent.",
-        "- Output ONLY the rewritten passage. No greeting, explanation, quotes, or labels.",
+        "- Keep the original meaning and emotional direction. Do not flip the intent.",
+        "- Do NOT add or remove brackets [ ], quotation marks, asterisks, or any framing punctuation that is not already in the passage.",
+        "- Output ONLY the rewritten passage, similar in length to the original. No greeting, explanation, quotes, or labels.",
         "",
         ctxBefore ? `CONTEXT BEFORE (reference only, do not rewrite):\n${ctxBefore}` : "",
         ctxAfter ? `CONTEXT AFTER (reference only, do not rewrite):\n${ctxAfter}` : "",
@@ -730,7 +732,9 @@ async function rewriteFull(c, before, target, after, phrases) {
     const targetOneLine = target.trim().replace(/[\r\n]+/g, " ");
     const prompt = buildRewritePrompt(before, target, after, phrases);
     console.log(`[SlopKiller] [재작성] 교체 대상 문장: "${targetOneLine.slice(0, 80)}..."`);
-    const responseLength = Math.max(120, Math.min(800, Math.ceil(target.length * 2)));
+    // Tight cap so the model can't ramble into extra sentences — just enough
+    // headroom over the original length.
+    const responseLength = Math.max(50, Math.min(400, Math.ceil(target.length * 1.3) + 20));
     const raw = await generateRewrite(c, prompt, REWRITE_SYSTEM_PROMPT, responseLength);
     console.log(`[SlopKiller] [재작성] 모델 응답 (앞 120자): "${raw.slice(0, 120).replace(/\n/g, " ")}"`);
 
@@ -740,7 +744,12 @@ async function rewriteFull(c, before, target, after, phrases) {
     if (looksLikeEcho(replacement, before, after)) { console.warn(`[SlopKiller] 모델이 컨텍스트 에코함 — 폐기: "${replacement.slice(0, 60)}"`); return null; }
     if (earliestBannedPos(replacement, phrases) >= 0) { console.warn("[SlopKiller] 응답에 금지 표현이 그대로 있음 — 폐기"); return null; }
     if (replacement.replace(/\s+/g, " ") === target.trim().replace(/\s+/g, " ")) { console.warn("[SlopKiller] 모델이 원문 그대로 반환함 — 폐기"); return null; }
-    if (replacement.length > target.length * 5 + 200) { console.warn(`[SlopKiller] 응답이 원본보다 너무 김 (원본 ${target.length}자, 응답 ${replacement.length}자) — 폐기`); return null; }
+    // Reject if much longer than the original — means the model invented extra content.
+    if (replacement.length > target.length * 2 + 60) { console.warn(`[SlopKiller] 응답이 원본보다 너무 김 (원본 ${target.length}자, 응답 ${replacement.length}자) — 폐기`); return null; }
+    // Reject if the sentence count jumped — model added sentences.
+    const cntTarget = (targetOneLine.match(/\.{2,}|[.!?。！？]/g) || []).length;
+    const cntRep = (replacement.match(/\.{2,}|[.!?。！？]/g) || []).length;
+    if (cntTarget > 0 && cntRep > cntTarget + 1) { console.warn(`[SlopKiller] 문장 수 급증 (원본 ${cntTarget} → 응답 ${cntRep}) — 폐기`); return null; }
     return replacement;
 }
 
