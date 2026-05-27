@@ -1309,7 +1309,7 @@ function buildPanel() {
                 <!-- 금지어 (캐릭터별) -->
                 <div class="sk_tab_panel" data-tab="banned">
                     <h4><i class="fa-solid fa-chart-simple sk_h4_icon"></i>현재 캐릭터: <span id="sk_charname" class="sk_charname"></span></h4>
-                    <label>💡 기본형 하나로 AI가 우회 생성하는 조사·어미 변형까지 모두 차단합니다. 한국어 감지 시 잘려 보이는 것이로 정상입니다.</label>
+                    <label>💡 기본형 하나로 AI가 우회 생성하는 조사·어미 변형까지 모두 차단합니다. 한국어 감지 시 잘려 보이는 것이 정상입니다.</label>
                     <p class="sk_hint">자주 반복된 표현입니다 (많은 순). <i class="fa-solid fa-ban sk_ic_ban"></i> 누르면 금지어로 추가 · <i class="fa-solid fa-check sk_ic_allow"></i> 누르면 반복 아님으로 제외</p>
                     <div id="sk_ranking" class="sk_ranking"></div>
                     <button id="sk_rescan" class="menu_button sk_rescan_btn">다시 스캔</button>
