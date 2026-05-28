@@ -234,27 +234,18 @@ function getGlobal() {
 
 // Global ∪ character, deduped and normalized. Used everywhere a "effective"
 // ban/allow list is needed (injection, highlight, reroll, ranking).
-function mergedBanned() {
+function mergedList(kind) {
     const cd = getCharData(getCurrentCharName());
     const g = getGlobal();
     const seen = new Set(), out = [];
-    for (const p of [...g.banned, ...cd.banned]) {
+    for (const p of [...g[kind], ...cd[kind]]) {
         const k = normalizePhrase(p);
         if (k && !seen.has(k)) { seen.add(k); out.push(k); }
     }
     return out;
 }
-
-function mergedAllowed() {
-    const cd = getCharData(getCurrentCharName());
-    const g = getGlobal();
-    const seen = new Set(), out = [];
-    for (const p of [...g.allowed, ...cd.allowed]) {
-        const k = normalizePhrase(p);
-        if (k && !seen.has(k)) { seen.add(k); out.push(k); }
-    }
-    return out;
-}
+function mergedBanned()  { return mergedList("banned"); }
+function mergedAllowed() { return mergedList("allowed"); }
 
 // ====================================================================
 // Text → n-grams → counts (recomputed live, never stored)
@@ -1022,6 +1013,36 @@ function applyTheme() {
 // Ban / allow actions — per-character and global, plus promote/demote
 // ====================================================================
 
+// Primitive helpers shared by all mutators below.
+// `commit` saves + re-renders so every mutation gets consistent UI refresh.
+function commit() { save(); renderPanel(); refreshAllHighlights(); }
+
+// Returns the char or global container object.
+function scopeContainer(scope) {
+    return scope === "global" ? getGlobal() : getCharData(getCurrentCharName());
+}
+
+const _OPPOSITE = { banned: "allowed", allowed: "banned" };
+
+// Add phrase to container[kind], evict from opposite list to avoid conflicts.
+function phraseAdd(scope, kind, p) {
+    const c = scopeContainer(scope);
+    c[_OPPOSITE[kind]] = c[_OPPOSITE[kind]].filter(x => normalizePhrase(x) !== p);
+    if (!c[kind].some(x => normalizePhrase(x) === p)) c[kind].push(p);
+}
+
+// Remove phrase from container[kind].
+function phraseRemove(scope, kind, p) {
+    const c = scopeContainer(scope);
+    c[kind] = c[kind].filter(x => normalizePhrase(x) !== p);
+}
+
+// Move phrase from one scope to another (same kind).
+function phraseMove(fromScope, toScope, kind, p) {
+    phraseRemove(fromScope, kind, p);
+    phraseAdd(toScope, kind, p);
+}
+
 // Auto-learn: after a user bans phrase X, surface other same-length n-grams
 // in the chat that share ≥ 1 content word with X. AI bypass variants almost
 // always reuse the core noun/verb stem ("허리 잡고" → "허리 붙잡고", "허리에 손을"),
@@ -1127,123 +1148,49 @@ async function maybeAutoLearn(bannedPhrase, scope) {
     const picked = await showAutoLearnModal(bannedPhrase, candidates);
     if (!picked.length) return;
 
-    const target = scope === "global" ? getGlobal() : getCharData(getCurrentCharName());
     for (const raw of picked) {
         const np = normalizePhrase(raw);
-        if (!np) continue;
-        target.allowed = target.allowed.filter(x => normalizePhrase(x) !== np);
-        if (!target.banned.some(x => normalizePhrase(x) === np)) target.banned.push(np);
+        if (np) phraseAdd(scope, "banned", np);
     }
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    commit();
 }
 
 async function addBanned(phrase) {
-    const p = normalizePhrase(phrase);
-    if (!p) return;
-    const cd = getCharData(getCurrentCharName());
-    cd.allowed = cd.allowed.filter(x => normalizePhrase(x) !== p);
-    if (!cd.banned.some(x => normalizePhrase(x) === p)) cd.banned.push(p);
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    const p = normalizePhrase(phrase); if (!p) return;
+    phraseAdd("char", "banned", p); commit();
     await maybeAutoLearn(p, "char");
 }
-
 function addAllowed(phrase) {
-    const p = normalizePhrase(phrase);
-    if (!p) return;
-    const cd = getCharData(getCurrentCharName());
-    cd.banned = cd.banned.filter(x => normalizePhrase(x) !== p);
-    if (!cd.allowed.some(x => normalizePhrase(x) === p)) cd.allowed.push(p);
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    const p = normalizePhrase(phrase); if (!p) return;
+    phraseAdd("char", "allowed", p); commit();
 }
-
 function removeFrom(kind, phrase) {
-    const p = normalizePhrase(phrase);
-    const cd = getCharData(getCurrentCharName());
-    if (kind === "banned") cd.banned = cd.banned.filter(x => normalizePhrase(x) !== p);
-    else cd.allowed = cd.allowed.filter(x => normalizePhrase(x) !== p);
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    const p = normalizePhrase(phrase); if (!p) return;
+    phraseRemove("char", kind, p); commit();
 }
-
 async function addBannedGlobal(phrase) {
-    const p = normalizePhrase(phrase);
-    if (!p) return;
-    const g = getGlobal();
-    g.allowed = g.allowed.filter(x => normalizePhrase(x) !== p);
-    if (!g.banned.some(x => normalizePhrase(x) === p)) g.banned.push(p);
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    const p = normalizePhrase(phrase); if (!p) return;
+    phraseAdd("global", "banned", p); commit();
     await maybeAutoLearn(p, "global");
 }
-
 function addAllowedGlobal(phrase) {
-    const p = normalizePhrase(phrase);
-    if (!p) return;
-    const g = getGlobal();
-    g.banned = g.banned.filter(x => normalizePhrase(x) !== p);
-    if (!g.allowed.some(x => normalizePhrase(x) === p)) g.allowed.push(p);
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    const p = normalizePhrase(phrase); if (!p) return;
+    phraseAdd("global", "allowed", p); commit();
 }
-
 function removeFromGlobal(kind, phrase) {
-    const p = normalizePhrase(phrase);
-    const g = getGlobal();
-    if (kind === "banned") g.banned = g.banned.filter(x => normalizePhrase(x) !== p);
-    else g.allowed = g.allowed.filter(x => normalizePhrase(x) !== p);
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    const p = normalizePhrase(phrase); if (!p) return;
+    phraseRemove("global", kind, p); commit();
 }
-
-// Move a phrase from current-character list → global list (or vice versa).
-// Idempotent: dedupes at the destination, removes from the source.
+// Move a phrase between scopes (same kind). Idempotent — dedupes at destination.
 function promoteToGlobal(phrase, kind) {
-    const p = normalizePhrase(phrase);
-    if (!p) return;
-    const cd = getCharData(getCurrentCharName());
-    const g = getGlobal();
-    if (kind === "banned") {
-        cd.banned = cd.banned.filter(x => normalizePhrase(x) !== p);
-        if (!g.banned.some(x => normalizePhrase(x) === p)) g.banned.push(p);
-    } else {
-        cd.allowed = cd.allowed.filter(x => normalizePhrase(x) !== p);
-        if (!g.allowed.some(x => normalizePhrase(x) === p)) g.allowed.push(p);
-    }
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    const p = normalizePhrase(phrase); if (!p) return;
+    phraseMove("char", "global", kind, p); commit();
 }
-
 function demoteToCharacter(phrase, kind) {
     const p = normalizePhrase(phrase);
-    const name = getCurrentCharName();
     if (!p) return;
-    if (!name) {
-        toastr?.warning?.("캐릭터가 선택되지 않았습니다");
-        return;
-    }
-    const cd = getCharData(name);
-    const g = getGlobal();
-    if (kind === "banned") {
-        g.banned = g.banned.filter(x => normalizePhrase(x) !== p);
-        if (!cd.banned.some(x => normalizePhrase(x) === p)) cd.banned.push(p);
-    } else {
-        g.allowed = g.allowed.filter(x => normalizePhrase(x) !== p);
-        if (!cd.allowed.some(x => normalizePhrase(x) === p)) cd.allowed.push(p);
-    }
-    save();
-    renderPanel();
-    refreshAllHighlights();
+    if (!getCurrentCharName()) { toastr?.warning?.("캐릭터가 선택되지 않았습니다"); return; }
+    phraseMove("global", "char", kind, p); commit();
 }
 
 // ====================================================================
@@ -1506,48 +1453,29 @@ function switchTab(tabName) {
     }
 }
 
-function bindPanel() {
+// Module-level binding helpers used by bindPanel and its sub-binders.
+function bindCheckbox(id, key, after) {
     const s = getSettings();
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("change", () => { s[key] = el.checked; save(); after?.(); });
+}
 
-    const bindCheckbox = (id, key, after) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener("change", () => {
-            s[key] = el.checked;
-            save();
-            after?.();
-        });
-    };
+function bindSlider(id, key, parser = parseInt, after) {
+    const s = getSettings();
+    const el = document.getElementById(id);
+    const lbl = document.getElementById(`${id}_val`);
+    if (!el) return;
+    el.addEventListener("input", () => { s[key] = parser(el.value); if (lbl) lbl.textContent = el.value; });
+    el.addEventListener("change", () => { save(); after?.(); });
+}
 
-    const bindSlider = (id, key, parser = parseInt, after) => {
-        const el = document.getElementById(id);
-        const lbl = document.getElementById(`${id}_val`);
-        if (!el) return;
-        el.addEventListener("input", () => {
-            s[key] = parser(el.value);
-            if (lbl) lbl.textContent = el.value;
-        });
-        el.addEventListener("change", () => { save(); after?.(); });
-    };
-
-    bindCheckbox("sk_enabled", "enabled", () => { renderPanel(); refreshAllHighlights(); });
-    bindSlider("sk_minN", "minN", parseInt, () => { renderPanel(); refreshAllHighlights(); });
-    bindSlider("sk_maxN", "maxN", parseInt, () => { renderPanel(); refreshAllHighlights(); });
-    bindSlider("sk_threshold", "threshold", parseInt, () => { renderPanel(); refreshAllHighlights(); });
-    bindSlider("sk_scanDepth", "scanDepth", parseInt, () => { renderPanel(); refreshAllHighlights(); });
-
-    const csEl = document.getElementById("sk_customStopwords");
-    if (csEl) {
-        csEl.addEventListener("input", () => { s.customStopwords = csEl.value; });
-        csEl.addEventListener("change", () => { save(); renderPanel(); refreshAllHighlights(); });
-    }
-
-    // ---- 감지 프리셋 ----
+// ---- Preset CRUD ----
+function bindPresets() {
+    const s = getSettings();
     const presetSel  = document.getElementById("sk_preset_select");
     const presetName = document.getElementById("sk_preset_name");
-    const presetSave = document.getElementById("sk_preset_save");
-    const presetLoad = document.getElementById("sk_preset_load");
-    const presetDel  = document.getElementById("sk_preset_delete");
+    const csEl       = document.getElementById("sk_customStopwords");
 
     function renderPresetSelect(selectedName) {
         if (!presetSel) return;
@@ -1569,7 +1497,6 @@ function bindPanel() {
         if (typeof p.threshold === "number") s.threshold = p.threshold;
         if (typeof p.scanDepth === "number") s.scanDepth = p.scanDepth;
         if (typeof p.customStopwords === "string") s.customStopwords = p.customStopwords;
-
         for (const k of ["minN", "maxN", "threshold", "scanDepth"]) {
             const el  = document.getElementById(`sk_${k}`);
             const lbl = document.getElementById(`sk_${k}_val`);
@@ -1579,70 +1506,44 @@ function bindPanel() {
         if (csEl) csEl.value = s.customStopwords || "";
     }
 
-    presetSave?.addEventListener("click", () => {
+    document.getElementById("sk_preset_save")?.addEventListener("click", () => {
         const name = (presetName?.value || "").trim();
         if (!name) { toastr?.warning?.("프리셋 이름을 입력하세요"); return; }
         s.detectPresets[name] = {
             minN: s.minN, maxN: s.maxN, threshold: s.threshold, scanDepth: s.scanDepth,
             customStopwords: s.customStopwords || "",
         };
-        save();
-        renderPresetSelect(name);
+        save(); renderPresetSelect(name);
         if (presetName) presetName.value = "";
         toastr?.success?.(`프리셋 저장: ${name}`);
     });
 
-    presetLoad?.addEventListener("click", () => {
+    document.getElementById("sk_preset_load")?.addEventListener("click", () => {
         const name = presetSel?.value;
         const p = name && s.detectPresets?.[name];
         if (!p) { toastr?.warning?.("프리셋을 선택하세요"); return; }
-        applyPresetValues(p);
-        save();
-        renderPanel();
-        refreshAllHighlights();
+        applyPresetValues(p); commit();
         toastr?.success?.(`프리셋 적용: ${name}`);
     });
 
-    presetDel?.addEventListener("click", () => {
+    document.getElementById("sk_preset_delete")?.addEventListener("click", () => {
         const name = presetSel?.value;
         if (!name || !s.detectPresets?.[name]) { toastr?.warning?.("프리셋을 선택하세요"); return; }
-        delete s.detectPresets[name];
-        save();
-        renderPresetSelect();
+        delete s.detectPresets[name]; save(); renderPresetSelect();
         toastr?.info?.(`프리셋 삭제: ${name}`);
     });
 
     renderPresetSelect();
+}
 
-    bindCheckbox("sk_injectEnabled", "injectEnabled");
-    bindSlider("sk_maxInject", "maxInject");
-
-    const tmplEl = document.getElementById("sk_injectTemplate");
-    tmplEl.addEventListener("input", () => { s.injectTemplate = tmplEl.value; });
-    tmplEl.addEventListener("change", save);
-    document.getElementById("sk_injectReset").addEventListener("click", () => {
-        s.injectTemplate = DEFAULT_SETTINGS.injectTemplate;
-        tmplEl.value = s.injectTemplate;
-        save();
-    });
-
-    bindCheckbox("sk_penaltyEnabled", "penaltyEnabled");
-    bindSlider("sk_penaltyBoost", "penaltyBoost", parseFloat);
-
-    bindCheckbox("sk_autoLearnEnabled", "autoLearnEnabled");
-    bindCheckbox("sk_autoReroll", "autoReroll");
-    bindSlider("sk_rerollMax", "rerollMax");
-
-
-
-    bindCheckbox("sk_dragToBan",        "dragToBan");
-    bindCheckbox("sk_highlightEnabled", "highlightEnabled", refreshAllHighlights);
-
-    const colorInput = document.getElementById("sk_highlightColor");
+// ---- Color picker ----
+function bindColorPicker() {
+    const s = getSettings();
+    const colorInput  = document.getElementById("sk_highlightColor");
     const colorPreview = document.getElementById("sk_color_preview");
+    if (!colorInput) return;
 
     function isHex(v) { return /^#[0-9a-fA-F]{6}$/.test(v); }
-
     function syncColorChips(hex) {
         document.querySelectorAll("#slop_killer_panel .sk_color_chip").forEach(btn => {
             btn.classList.toggle("sk_color_active", btn.dataset.color.toLowerCase() === hex.toLowerCase());
@@ -1666,64 +1567,14 @@ function bindPanel() {
             colorInput.value = hex;
             colorPreview.style.background = hex;
             syncColorChips(hex);
-            applyColor();
-            save();
+            applyColor(); save();
         });
     });
     syncColorChips(s.highlightColor);
+}
 
-    document.getElementById("sk_rescan").addEventListener("click", () => {
-        renderPanel();
-        refreshAllHighlights();
-    });
-
-    // Character-scope ban input
-    const banInput = document.getElementById("sk_ban_input");
-    const doAddChar = () => { if (banInput.value.trim()) { addBanned(banInput.value); banInput.value = ""; } };
-    document.getElementById("sk_ban_add").addEventListener("click", doAddChar);
-    banInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAddChar(); });
-
-    // Global-scope ban input
-    const globalBanInput = document.getElementById("sk_global_ban_input");
-    const doAddGlobal = () => {
-        if (globalBanInput.value.trim()) { addBannedGlobal(globalBanInput.value); globalBanInput.value = ""; }
-    };
-    document.getElementById("sk_global_ban_add").addEventListener("click", doAddGlobal);
-    globalBanInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAddGlobal(); });
-
-    // Search + sort
-    const bindFilter = (searchId, sortId, state) => {
-        const sEl = document.getElementById(searchId);
-        const sortEl = document.getElementById(sortId);
-        if (!sEl || !sortEl) return;
-        sEl.value = state.q;
-        sortEl.value = state.sort;
-        sEl.addEventListener("input", () => { state.q = sEl.value; renderChips(); });
-        sortEl.addEventListener("change", () => { state.sort = sortEl.value; renderChips(); });
-    };
-    bindFilter("sk_char_banned_search", "sk_char_banned_sort", _filter.charBanned);
-    bindFilter("sk_global_banned_search", "sk_global_banned_sort", _filter.globalBanned);
-
-    // Tabs
-    document.querySelectorAll("#slop_killer_panel .sk_tab_btn").forEach(btn => {
-        btn.addEventListener("click", () => switchTab(btn.dataset.tab));
-    });
-
-    // Theme
-    document.querySelectorAll("#slop_killer_panel .sk_theme_btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-            s.theme = btn.dataset.theme;
-            applyTheme();
-            save();
-        });
-    });
-
-    // Window chrome — close button + backdrop click closes
-    const win = document.getElementById(`${MODULE_NAME}_panel`);
-    win.querySelector(".sk_window_close")?.addEventListener("click", closeWindow);
-    document.getElementById("sk_backdrop")?.addEventListener("click", closeWindow);
-
-    // JSON export/import helpers
+// ---- JSON import / export ----
+function bindImportExport() {
     function downloadJson(data, filename) {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
@@ -1753,25 +1604,19 @@ function bindPanel() {
                         : "이 파일은 글로벌 전용이 아닙니다 (캐릭터 파일로 보입니다).");
                 } else if (!Array.isArray(data.banned) && !Array.isArray(data.allowed)) {
                     alert("올바른 형식이 아닙니다. banned / allowed 목록이 필요합니다.");
-                } else {
-                    onValid(data);
-                    save(); renderPanel(); refreshAllHighlights();
-                }
+                } else { onValid(data); commit(); }
             } catch { alert("올바른 JSON 파일이 아닙니다."); }
             input.value = "";
         };
         reader.readAsText(file);
     }
 
-    // Character scope — export
     document.getElementById("sk_char_export").addEventListener("click", () => {
         const name = getCurrentCharName();
         const cd = getCharData(name);
         const safe = (name || "noname").replace(/[^a-z0-9가-힣]/gi, "_");
         downloadJson({ scope: "character", name: name || "", banned: cd.banned, allowed: cd.allowed }, `slop-killer-char-${safe}.json`);
     });
-
-    // Character scope — import (merge)
     document.getElementById("sk_char_import_btn").addEventListener("click", () => {
         document.getElementById("sk_char_import").click();
     });
@@ -1782,14 +1627,10 @@ function bindPanel() {
             if (Array.isArray(data.allowed)) importIntoList(cd.allowed, data.allowed);
         });
     });
-
-    // Global scope — export
     document.getElementById("sk_global_export").addEventListener("click", () => {
         const g = getGlobal();
         downloadJson({ scope: "global", banned: g.banned, allowed: g.allowed }, "slop-killer-global.json");
     });
-
-    // Global scope — import (merge)
     document.getElementById("sk_global_import_btn").addEventListener("click", () => {
         document.getElementById("sk_global_import").click();
     });
@@ -1800,6 +1641,88 @@ function bindPanel() {
             if (Array.isArray(data.allowed)) importIntoList(g.allowed, data.allowed);
         });
     });
+}
+
+// ---- Ban text inputs (char + global) ----
+function bindBanInputs() {
+    const bindBanInput = (inputId, btnId, addFn) => {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const doAdd = () => { if (input.value.trim()) { addFn(input.value); input.value = ""; } };
+        document.getElementById(btnId)?.addEventListener("click", doAdd);
+        input.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+    };
+    bindBanInput("sk_ban_input",        "sk_ban_add",        addBanned);
+    bindBanInput("sk_global_ban_input", "sk_global_ban_add", addBannedGlobal);
+}
+
+function bindPanel() {
+    const s = getSettings();
+    const rerender = () => { renderPanel(); refreshAllHighlights(); };
+
+    bindCheckbox("sk_enabled", "enabled", rerender);
+    bindSlider("sk_minN",       "minN",       parseInt,    rerender);
+    bindSlider("sk_maxN",       "maxN",       parseInt,    rerender);
+    bindSlider("sk_threshold",  "threshold",  parseInt,    rerender);
+    bindSlider("sk_scanDepth",  "scanDepth",  parseInt,    rerender);
+
+    const csEl = document.getElementById("sk_customStopwords");
+    if (csEl) {
+        csEl.addEventListener("input",  () => { s.customStopwords = csEl.value; });
+        csEl.addEventListener("change", () => { save(); rerender(); });
+    }
+
+    bindPresets();
+
+    bindCheckbox("sk_injectEnabled", "injectEnabled");
+    bindSlider("sk_maxInject", "maxInject");
+
+    const tmplEl = document.getElementById("sk_injectTemplate");
+    tmplEl.addEventListener("input", () => { s.injectTemplate = tmplEl.value; });
+    tmplEl.addEventListener("change", save);
+    document.getElementById("sk_injectReset").addEventListener("click", () => {
+        s.injectTemplate = DEFAULT_SETTINGS.injectTemplate;
+        tmplEl.value = s.injectTemplate;
+        save();
+    });
+
+    bindCheckbox("sk_penaltyEnabled",   "penaltyEnabled");
+    bindSlider("sk_penaltyBoost",        "penaltyBoost", parseFloat);
+    bindCheckbox("sk_autoLearnEnabled", "autoLearnEnabled");
+    bindCheckbox("sk_autoReroll",       "autoReroll");
+    bindSlider("sk_rerollMax",           "rerollMax");
+    bindCheckbox("sk_dragToBan",        "dragToBan");
+    bindCheckbox("sk_highlightEnabled", "highlightEnabled", refreshAllHighlights);
+
+    bindColorPicker();
+
+    document.getElementById("sk_rescan").addEventListener("click", rerender);
+
+    bindBanInputs();
+
+    const bindFilter = (searchId, sortId, state) => {
+        const sEl = document.getElementById(searchId);
+        const sortEl = document.getElementById(sortId);
+        if (!sEl || !sortEl) return;
+        sEl.value = state.q; sortEl.value = state.sort;
+        sEl.addEventListener("input",   () => { state.q    = sEl.value;     renderChips(); });
+        sortEl.addEventListener("change", () => { state.sort = sortEl.value; renderChips(); });
+    };
+    bindFilter("sk_char_banned_search",   "sk_char_banned_sort",   _filter.charBanned);
+    bindFilter("sk_global_banned_search", "sk_global_banned_sort", _filter.globalBanned);
+
+    document.querySelectorAll("#slop_killer_panel .sk_tab_btn").forEach(btn => {
+        btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+    document.querySelectorAll("#slop_killer_panel .sk_theme_btn").forEach(btn => {
+        btn.addEventListener("click", () => { s.theme = btn.dataset.theme; applyTheme(); save(); });
+    });
+
+    const win = document.getElementById(`${MODULE_NAME}_panel`);
+    win.querySelector(".sk_window_close")?.addEventListener("click", closeWindow);
+    document.getElementById("sk_backdrop")?.addEventListener("click", closeWindow);
+
+    bindImportExport();
 }
 
 function renderPanel() {
