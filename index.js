@@ -1408,7 +1408,7 @@ function buildPanel() {
                     <h4><i class="fa-solid fa-hand-pointer sk_h4_icon"></i>드래그 추가</h4>
                     <label class="checkbox_label">
                         <input id="sk_dragToBan" type="checkbox" ${s.dragToBan ? "checked" : ""}>
-                        <span>채팅 텍스트를 드래그하면 금지어 추가 팝업 표시</span>
+                        <span>텍스트 드래그로 금지어 추가</span>
                     </label>
                     <p class="sk_hint">모바일·PC에서 메시지 일부를 선택하면 바로 금지어로 추가할 수 있는 버튼이 뜹니다. 네이티브 복사 기능과 함께 동작합니다.</p>
 
