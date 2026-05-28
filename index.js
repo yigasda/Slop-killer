@@ -1369,7 +1369,7 @@ function buildPanel() {
                     </label>
                     <label>한 번에 알려줄 표현 — 최대 <span id="sk_maxInject_val">${s.maxInject}</span>개</label>
                     <input id="sk_maxInject" type="range" min="1" max="60" value="${s.maxInject}" class="sk_slider">
-                    <p class="sk_hint">30~40개를 넘어가면 모델이 일부를 무시할 수 있어요. 그럴 땐 자동 리롤 기능을 함께 사용하세요.</p>
+                    <p class="sk_hint">30~40개를 넘어가면 모델이 일부를 무시할 수 있습니다. 그럴 땐 자동 리롤 기능을 함께 사용하세요.</p>
                     <label>모델에게 보낼 문구</label>
                     <p class="sk_hint"><code>{{banned}}</code> 자리엔 등록한 금지어, <code>{{slop}}</code> 자리엔 자동으로 찾은 반복 표현, <code>{{phrases}}</code> 자리엔 둘 다. 해당 목록이 비어 있으면 그 줄은 자동 생략됩니다.</p>
                     <textarea id="sk_injectTemplate" class="text_pole sk_template" rows="4" spellcheck="false">${escapeHtml(s.injectTemplate)}</textarea>
