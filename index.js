@@ -553,16 +553,24 @@ function earliestBannedPos(text, phrases) {
 
 // Find the sentence containing position `idx`. Returns {start, end} where
 // text.slice(start, end) is the whole sentence (with trailing punct/newline).
+// Segment terminators, in priority of "smaller span is safer":
+//   1. .!?… optionally trailed by closing quotes/brackets/asterisks, then space/EOL
+//   2. a run of asterisks (RP action line *…* or **bold**) then space/EOL — even
+//      without a period, so "*그가 웃었다*" doesn't bleed into the next sentence
+//   3. one or more newlines
+// Before the asterisk rule, a banned phrase inside "*…다.*" missed its boundary
+// (the . was followed by *, not whitespace) and swallowed the NEXT sentence too,
+// which is the main cause of "whole message gets rerolled instead of one sentence".
 function sentenceBoundsAt(text, idx) {
-    const beforeRe = /[.!?…]["'"')\]]*\s+|\n+/g;
+    const boundary = /[.!?…]["'"')\]\*]*(?:\s+|$)|\*+(?:\s+|$)|\n+/g;
     let start = 0, m;
-    while ((m = beforeRe.exec(text)) !== null) {
+    boundary.lastIndex = 0;
+    while ((m = boundary.exec(text)) !== null) {
         if (m.index + m[0].length > idx) break;
         start = m.index + m[0].length;
     }
-    const afterRe = /[.!?…]["'"')\]]*(?:\s+|$)|\n/g;
-    afterRe.lastIndex = idx;
-    const after = afterRe.exec(text);
+    boundary.lastIndex = idx;
+    const after = boundary.exec(text);
     const end = after ? after.index + after[0].length : text.length;
     return { start, end };
 }
