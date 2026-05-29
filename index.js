@@ -876,7 +876,7 @@ async function maybeReroll(rawId) {
     } finally {
         _rerollBusy = false;
         refreshAllHighlights();
-        if (fixed > 0) toastr?.success?.(`${fixed}개 문장 수정됨`, "AI 반복 킬러", { timeOut: 3000 });
+        if (fixed > 0) toastr?.success?.(`${fixed}개 문장 수정됨`);
     }
 }
 
@@ -1415,7 +1415,7 @@ function buildPanel() {
                         <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
                         <span>등록한 금지어가 답변에 나오면 자동으로 다시 생성합니다</span>
                     </label>
-                    <p class="sk_hint">금지 표현이 든 <b>문장만</b> 별도로 모델에 요청해 같은 의미·감정을 유지하면서 자연스럽게 다시 씁니다. 나머지 메시지는 그대로 유지됩니다. 금지어가 여러 개면 깨끗해질 때까지 하나씩 모두 고칩니다. (토큰 추가 소모)</p>
+                    <p class="sk_hint">금지 표현이 든 <b>문장만</b> 별도로 모델에 요청해 같은 의미·감정을 유지하면서 자연스럽게 다시 씁니다. 나머지 메시지는 그대로 유지됩니다. (토큰 추가 소모)</p>
                     <label>한 구간 재시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
                     <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
 
