@@ -829,22 +829,44 @@ async function maybeReroll(rawId) {
     if (phrases.length === 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 금지어 없음`); return; }
     if (earliestBannedPos(msg.mes, phrases) < 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 메시지에 금지 표현 없음`); return; }
 
-    const spent = _rerollCount.get(mesId) || 0;
-    if (spent >= s.rerollMax) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: rerollMax 소진 (${spent}/${s.rerollMax})`); return; }
+    // HARD_CAP is an absolute ceiling on LLM calls per message so a reply that is
+    // dense with banned phrases can't trigger a runaway loop. It is intentionally
+    // generous — we want to clean the WHOLE message, not stop at rerollMax.
+    const HARD_CAP = 50;
+    const startCalls = _rerollCount.get(mesId) || 0;
+    if (startCalls >= HARD_CAP) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 호출 상한 도달 (${startCalls}/${HARD_CAP})`); return; }
 
-    console.log(`[SlopKiller] 자동 리롤 시작: mesId=${mesId}, 시도=${spent + 1}/${s.rerollMax}`);
+    // rerollMax (slider) = how many times to RETRY when a rewrite fails validation
+    // on the SAME spot before giving up on it. Distinct banned occurrences are each
+    // fixed in turn — the loop keeps going until the message is clean, so a message
+    // with more occurrences than rerollMax still gets fully cleaned.
+    const retryBudget = Math.max(1, s.rerollMax);
+
+    console.log(`[SlopKiller] 자동 리롤 시작: mesId=${mesId}, 재시도 한도=${retryBudget}/구간`);
     _rerollBusy = true;
+    let calls = startCalls;
+    let fails = 0;
     try {
-        for (let attempt = spent; attempt < s.rerollMax; attempt++) {
-            _rerollCount.set(mesId, attempt + 1);
-            console.log(`[SlopKiller] rerollSurgically 호출 중... (attempt ${attempt + 1})`);
-            const ok = await rerollSurgically(c, mesId, phrases);
-            console.log(`[SlopKiller] rerollSurgically 결과: ok=${ok}`);
-            if (!ok) continue;   // validation failed → try again up to rerollMax
+        while (calls < HARD_CAP) {
             const cur = c.chat[mesId];
             if (!cur || earliestBannedPos(cur.mes, phrases) < 0) {
                 console.log("[SlopKiller] 금지 표현 제거 완료");
                 break;
+            }
+            const prev = cur.mes;
+            calls++;
+            _rerollCount.set(mesId, calls);
+            console.log(`[SlopKiller] rerollSurgically 호출 중... (call ${calls}, 연속실패 ${fails}/${retryBudget})`);
+            const ok = await rerollSurgically(c, mesId, phrases);
+            const changed = (c.chat[mesId]?.mes ?? "") !== prev;
+            if (ok && changed) {
+                fails = 0;   // progress on this occurrence → fresh retry budget for the next
+            } else {
+                fails++;     // stuck on this spot (validation failed / no change)
+                if (fails >= retryBudget) {
+                    console.log(`[SlopKiller] 한 구간에서 ${retryBudget}회 연속 실패 — 중단`);
+                    break;
+                }
             }
         }
     } catch (err) {
@@ -1390,8 +1412,8 @@ function buildPanel() {
                         <input id="sk_autoReroll" type="checkbox" ${s.autoReroll ? "checked" : ""}>
                         <span>등록한 금지어가 답변에 나오면 자동으로 다시 생성합니다</span>
                     </label>
-                    <p class="sk_hint">금지 표현이 든 <b>문장만</b> 별도로 모델에 요청해 같은 의미·감정을 유지하면서 자연스럽게 다시 씁니다. 나머지 메시지는 그대로 유지됩니다. (토큰 추가 소모)</p>
-                    <label>다시 시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
+                    <p class="sk_hint">금지 표현이 든 <b>문장만</b> 별도로 모델에 요청해 같은 의미·감정을 유지하면서 자연스럽게 다시 씁니다. 나머지 메시지는 그대로 유지됩니다. 금지어가 여러 개면 깨끗해질 때까지 하나씩 모두 고칩니다. (토큰 추가 소모)</p>
+                    <label>한 구간 재시도 — 최대 <span id="sk_rerollMax_val">${s.rerollMax}</span>회</label>
                     <input id="sk_rerollMax" type="range" min="1" max="5" value="${s.rerollMax}" class="sk_slider">
 
                     <hr>
@@ -2007,8 +2029,8 @@ jQuery(() => {
             const id = Number(mesId);
             console.log(`[SlopKiller] MESSAGE_RECEIVED: mesId=${mesId} → _lastFreshId=${id}`);
             _lastFreshId = id;
-            // Fresh generation → reset attempt counter so the user gets a full
-            // rerollMax budget on every new swipe/regen of this mesId.
+            // Fresh generation → reset the per-message call counter so every new
+            // swipe/regen of this mesId starts cleaning from scratch.
             _rerollCount.delete(id);
             queueReroll();
         });
