@@ -876,7 +876,7 @@ async function maybeReroll(rawId) {
     } finally {
         _rerollBusy = false;
         refreshAllHighlights();
-        if (fixed > 0) toastr?.success?.(`${fixed}개 문장 수정됨`);
+        if (fixed > 0) toastr?.success?.(`금지 표현 ${fixed}개 제거됨`);
     }
 }
 
