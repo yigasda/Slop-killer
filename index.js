@@ -846,6 +846,7 @@ async function maybeReroll(rawId) {
     _rerollBusy = true;
     let calls = startCalls;
     let fails = 0;
+    let fixed = 0;
     try {
         while (calls < HARD_CAP) {
             const cur = c.chat[mesId];
@@ -860,9 +861,10 @@ async function maybeReroll(rawId) {
             const ok = await rerollSurgically(c, mesId, phrases);
             const changed = (c.chat[mesId]?.mes ?? "") !== prev;
             if (ok && changed) {
-                fails = 0;   // progress on this occurrence → fresh retry budget for the next
+                fixed++;
+                fails = 0;
             } else {
-                fails++;     // stuck on this spot (validation failed / no change)
+                fails++;
                 if (fails >= retryBudget) {
                     console.log(`[SlopKiller] 한 구간에서 ${retryBudget}회 연속 실패 — 중단`);
                     break;
@@ -874,6 +876,7 @@ async function maybeReroll(rawId) {
     } finally {
         _rerollBusy = false;
         refreshAllHighlights();
+        if (fixed > 0) toastr?.success?.(`${fixed}개 문장 수정됨`, "AI 반복 킬러", { timeOut: 3000 });
     }
 }
 
