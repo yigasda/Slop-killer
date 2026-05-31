@@ -693,14 +693,19 @@ async function generateRewrite(c, prompt, systemPrompt, responseLength) {
     const genQuiet = c.generateQuietPrompt ?? globalThis.generateQuietPrompt;
     console.log(`[SlopKiller] generateRaw=${typeof genRaw}, generateQuietPrompt=${typeof genQuiet}, responseLength=${responseLength}`);
 
-    // Temporarily set reasoning_effort to 'low' so reasoning/thinking models
-    // (DeepSeek R1, o-series, Gemini thinking) don't burn their whole token
-    // budget on chain-of-thought before writing a single word. Restored after.
-    const oaiSettings = globalThis.oai_settings;
-    const prevEffort = oaiSettings?.reasoning_effort;
-    if (oaiSettings && prevEffort !== undefined) {
-        oaiSettings.reasoning_effort = "low";
-        console.log(`[SlopKiller] reasoning_effort 임시 변경: ${prevEffort} → low`);
+    // Reroll is a mechanical edit — chain-of-thought just wastes the token budget
+    // (DeepSeek R1 burned its entire max_tokens on reasoning, returning an empty
+    // reply). Temporarily suppress reasoning on the shared chat-completion settings
+    // and restore afterwards. Levers differ by backend, so we set both:
+    //   • show_thoughts=false  → include_reasoning=false → DeepSeek thinking:disabled
+    //   • reasoning_effort=low → smaller Gemini thinkingBudget / OpenAI o-series effort
+    // (Same proven approach as boostPenalty, via getContext().chatCompletionSettings.)
+    const oai = c.chatCompletionSettings;
+    const restore = {};
+    if (oai) {
+        if ("show_thoughts" in oai)    { restore.show_thoughts = oai.show_thoughts;       oai.show_thoughts = false; }
+        if ("reasoning_effort" in oai) { restore.reasoning_effort = oai.reasoning_effort; oai.reasoning_effort = "low"; }
+        console.log(`[SlopKiller] 추론 임시 억제: show_thoughts=${restore.show_thoughts}→false, reasoning_effort=${restore.reasoning_effort}→low`);
     }
 
     let raw = "";
@@ -718,24 +723,25 @@ async function generateRewrite(c, prompt, systemPrompt, responseLength) {
                 console.warn("[SlopKiller] generateRaw 실패, generateQuietPrompt로 폴백:", err?.message ?? err);
             }
         }
-    } finally {
-        if (oaiSettings && prevEffort !== undefined) {
-            oaiSettings.reasoning_effort = prevEffort;
-            console.log(`[SlopKiller] reasoning_effort 복원: ${prevEffort}`);
+
+        // Fall back to generateQuietPrompt not only when generateRaw is empty, but
+        // also when it returned a useless fragment (e.g. Vertex truncated to "[ 그").
+        const rawReal = (raw.match(/[\p{L}\p{N}]/gu) || []).length;
+        if (rawReal < 2 && typeof genQuiet === "function") {
+            try {
+                // No way to override systemPrompt on generateQuietPrompt — bake it
+                // into the user prompt itself.
+                const quietPrompt = systemPrompt + "\n\n" + prompt;
+                const q = await genQuiet(quietPrompt, false, true, null, "SlopKillerEditor", responseLength);
+                if (q) { raw = String(q); }
+            } catch (err) {
+                console.error("[SlopKiller] generateQuietPrompt 오류:", err?.message ?? err);
+            }
         }
-    }
-    // Fall back to generateQuietPrompt not only when generateRaw is empty, but
-    // also when it returned a useless fragment (e.g. Vertex truncated to "[ 그").
-    const rawReal = (raw.match(/[\p{L}\p{N}]/gu) || []).length;
-    if (rawReal < 2 && typeof genQuiet === "function") {
-        try {
-            // No way to override systemPrompt on generateQuietPrompt — bake it
-            // into the user prompt itself.
-            const quietPrompt = systemPrompt + "\n\n" + prompt;
-            const q = await genQuiet(quietPrompt, false, true, null, "SlopKillerEditor", responseLength);
-            if (q) { raw = String(q); }
-        } catch (err) {
-            console.error("[SlopKiller] generateQuietPrompt 오류:", err?.message ?? err);
+    } finally {
+        if (oai) {
+            for (const [k, v] of Object.entries(restore)) oai[k] = v;
+            console.log("[SlopKiller] 추론 설정 복원");
         }
     }
     return String(raw);
