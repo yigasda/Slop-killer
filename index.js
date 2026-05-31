@@ -543,10 +543,10 @@ function restorePenalty() {
 // ====================================================================
 
 // Index of the earliest banned-phrase match in text, or -1.
-function earliestBannedPos(text, phrases) {
+function earliestBannedPos(text, phrases, fromPos = 0) {
     const re = buildPhraseRegex(phrases);
     if (!re) return -1;
-    re.lastIndex = 0;
+    re.lastIndex = Math.max(0, fromPos);
     const m = re.exec(text);
     return m ? m.index : -1;
 }
@@ -775,26 +775,31 @@ async function rewriteFull(c, before, target, after, phrases) {
     return replacement;
 }
 
-async function rerollSurgically(c, mesId, phrases) {
+// Reroll the earliest banned sentence at/after `minPos`. Returns:
+//   { done: true }                  — no banned phrase at/after minPos (clean from here)
+//   { changed: false, sentEnd }     — found one but the rewrite failed validation
+//   { changed: true,  sentEnd }     — rewrote and spliced it back
+// sentEnd is the offset just past the targeted sentence, so the caller can skip a
+// spot the model keeps refusing to fix and still try the remaining occurrences.
+async function rerollSurgically(c, mesId, phrases, minPos = 0) {
     const cur = c.chat[mesId];
-    if (!cur) return false;
+    if (!cur) return { done: true };
     const text = cur.mes;
-    const pos = earliestBannedPos(text, phrases);
-    if (pos < 0) return true;                          // nothing to do — success
+    const pos = earliestBannedPos(text, phrases, minPos);
+    if (pos < 0) return { done: true };                // nothing to do at/after minPos
 
-    const initial = sentenceBoundsAt(text, pos);
     // Use the single sentence only — the outer loop handles subsequent occurrences
     // one at a time. expandBoundsForAllBanned used to grab whole paragraphs when
     // multiple banned phrases sat nearby, giving the model a huge span to rewrite
     // and causing sentence-count explosions.
-    const { start, end } = initial;
+    const { start, end } = sentenceBoundsAt(text, pos);
     const before = text.slice(0, start);
     const target = text.slice(start, end);
     const after = text.slice(end);
-    if (!target.trim()) return false;
+    if (!target.trim()) return { changed: false, sentEnd: end };
 
     const newTarget = await rewriteFull(c, before, target, after, phrases);
-    if (newTarget === null) return false;
+    if (newTarget === null) return { changed: false, sentEnd: end };
 
     const needsLeadingSpace = before.length && !/\s$/.test(before) && !/^\s/.test(newTarget);
     const needsTrailingSpace = after.length && !/^\s/.test(after) && !/\s$/.test(newTarget);
@@ -806,7 +811,7 @@ async function rerollSurgically(c, mesId, phrases) {
         after;
     c.updateMessageBlock(mesId, cur);
     await c.saveChat();
-    return true;
+    return { changed: true, sentEnd: start + newTarget.length };
 }
 
 async function maybeReroll(rawId) {
@@ -847,27 +852,30 @@ async function maybeReroll(rawId) {
     let calls = startCalls;
     let fails = 0;
     let fixed = 0;
+    let floor = 0;   // char offset — occurrences before this were given up on, skip them
     try {
         while (calls < HARD_CAP) {
             const cur = c.chat[mesId];
-            if (!cur || earliestBannedPos(cur.mes, phrases) < 0) {
-                console.log("[SlopKiller] 금지 표현 제거 완료");
+            if (!cur || earliestBannedPos(cur.mes, phrases, floor) < 0) {
+                console.log("[SlopKiller] 금지 표현 제거 완료 (남은 구간 없음)");
                 break;
             }
-            const prev = cur.mes;
             calls++;
             _rerollCount.set(mesId, calls);
-            console.log(`[SlopKiller] rerollSurgically 호출 중... (call ${calls}, 연속실패 ${fails}/${retryBudget})`);
-            const ok = await rerollSurgically(c, mesId, phrases);
-            const changed = (c.chat[mesId]?.mes ?? "") !== prev;
-            if (ok && changed) {
+            console.log(`[SlopKiller] rerollSurgically 호출 중... (call ${calls}, floor=${floor}, 연속실패 ${fails}/${retryBudget})`);
+            const r = await rerollSurgically(c, mesId, phrases, floor);
+            if (r.done) { console.log("[SlopKiller] 금지 표현 제거 완료"); break; }
+            if (r.changed) {
                 fixed++;
-                fails = 0;
+                fails = 0;   // progress → the fixed sentence is now clean, keep going from floor
             } else {
-                fails++;
+                fails++;     // stuck on this sentence (validation keeps failing)
                 if (fails >= retryBudget) {
-                    console.log(`[SlopKiller] 한 구간에서 ${retryBudget}회 연속 실패 — 중단`);
-                    break;
+                    // The model refuses to fix THIS spot — skip past it and still try the
+                    // remaining occurrences instead of abandoning the whole message.
+                    console.log(`[SlopKiller] 한 구간 ${retryBudget}회 실패 — 건너뛰고 다음 구간으로 (floor→${r.sentEnd})`);
+                    floor = Math.max(floor + 1, r.sentEnd);
+                    fails = 0;
                 }
             }
         }
