@@ -743,9 +743,11 @@ async function rewriteFull(c, before, target, after, phrases) {
     const targetOneLine = target.trim().replace(/[\r\n]+/g, " ");
     const prompt = buildRewritePrompt(before, target, after, phrases);
     console.log(`[SlopKiller] [재작성] 교체 대상 문장: "${targetOneLine.slice(0, 80)}..."`);
-    // Tight cap so the model can't ramble into extra sentences — just enough
-    // headroom over the original length.
-    const responseLength = Math.max(50, Math.min(400, Math.ceil(target.length * 1.3) + 20));
+    // Reasoning models (DeepSeek R1, o-series, etc.) consume thinking tokens BEFORE
+    // writing the actual response — those tokens count against max_tokens too, so a
+    // tight cap of ~200 leaves zero room for the rewrite text and always truncates.
+    // Floor raised to 800 so there is headroom for ~400 reasoning tokens + the reply.
+    const responseLength = Math.max(800, Math.min(2000, Math.ceil(target.length * 1.3) + 20));
     const systemPrompt = REWRITE_SYSTEM_PROMPT;
     const raw = await generateRewrite(c, prompt, systemPrompt, responseLength);
     console.log(`[SlopKiller] [재작성] 모델 응답 (앞 120자): "${raw.slice(0, 120).replace(/\n/g, " ")}"`);
