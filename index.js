@@ -878,6 +878,7 @@ async function maybeReroll(rawId) {
     let calls = startCalls;
     let fails = 0;
     let fixed = 0;
+    let skipped = 0;   // spots the model kept refusing to fix (skipped after retries)
     let floor = 0;   // char offset — occurrences before this were given up on, skip them
     try {
         while (calls < HARD_CAP) {
@@ -902,6 +903,7 @@ async function maybeReroll(rawId) {
                     console.log(`[SlopKiller] 한 구간 ${retryBudget}회 실패 — 건너뛰고 다음 구간으로 (floor→${r.sentEnd})`);
                     floor = Math.max(floor + 1, r.sentEnd);
                     fails = 0;
+                    skipped++;
                 }
             }
         }
@@ -910,7 +912,11 @@ async function maybeReroll(rawId) {
     } finally {
         _rerollBusy = false;
         refreshAllHighlights();
-        if (fixed > 0) toastr?.success?.(`금지 표현 ${fixed}개 제거됨`);
+        if (skipped > 0) {
+            toastr?.warning?.(`금지 표현 ${fixed}개 제거 · ${skipped}개는 모델이 끝까지 거부함`);
+        } else if (fixed > 0) {
+            toastr?.success?.(`금지 표현 ${fixed}개 제거됨`);
+        }
     }
 }
 
