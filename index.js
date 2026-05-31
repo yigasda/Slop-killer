@@ -692,18 +692,36 @@ async function generateRewrite(c, prompt, systemPrompt, responseLength) {
     const genRaw = c.generateRaw ?? globalThis.generateRaw;
     const genQuiet = c.generateQuietPrompt ?? globalThis.generateQuietPrompt;
     console.log(`[SlopKiller] generateRaw=${typeof genRaw}, generateQuietPrompt=${typeof genQuiet}, responseLength=${responseLength}`);
+
+    // Temporarily set reasoning_effort to 'low' so reasoning/thinking models
+    // (DeepSeek R1, o-series, Gemini thinking) don't burn their whole token
+    // budget on chain-of-thought before writing a single word. Restored after.
+    const oaiSettings = globalThis.oai_settings;
+    const prevEffort = oaiSettings?.reasoning_effort;
+    if (oaiSettings && prevEffort !== undefined) {
+        oaiSettings.reasoning_effort = "low";
+        console.log(`[SlopKiller] reasoning_effort 임시 변경: ${prevEffort} → low`);
+    }
+
     let raw = "";
-    if (typeof genRaw === "function") {
-        try {
-            const out = await genRaw({
-                prompt, systemPrompt, responseLength, jsonSchema: null,
-            }).catch(async (e) => {
-                console.warn("[SlopKiller] generateRaw object-form 실패, positional 시도:", e?.message ?? e);
-                return await genRaw(prompt, null, false, false, systemPrompt, responseLength);
-            });
-            raw = String(out ?? "");
-        } catch (err) {
-            console.warn("[SlopKiller] generateRaw 실패, generateQuietPrompt로 폴백:", err?.message ?? err);
+    try {
+        if (typeof genRaw === "function") {
+            try {
+                const out = await genRaw({
+                    prompt, systemPrompt, responseLength, jsonSchema: null,
+                }).catch(async (e) => {
+                    console.warn("[SlopKiller] generateRaw object-form 실패, positional 시도:", e?.message ?? e);
+                    return await genRaw(prompt, null, false, false, systemPrompt, responseLength);
+                });
+                raw = String(out ?? "");
+            } catch (err) {
+                console.warn("[SlopKiller] generateRaw 실패, generateQuietPrompt로 폴백:", err?.message ?? err);
+            }
+        }
+    } finally {
+        if (oaiSettings && prevEffort !== undefined) {
+            oaiSettings.reasoning_effort = prevEffort;
+            console.log(`[SlopKiller] reasoning_effort 복원: ${prevEffort}`);
         }
     }
     // Fall back to generateQuietPrompt not only when generateRaw is empty, but
