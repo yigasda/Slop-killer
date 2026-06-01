@@ -933,6 +933,12 @@ globalThis.slopKillerInterceptor = async function (chat, _contextSize, _abort, t
     try {
         if (type === "quiet") return;
         const s = getSettings();
+        const c = ctx();
+        const INJECT_KEY = `${MODULE_NAME}_inject`;
+        // Clear our injection up front so a stale note never lingers into a
+        // generation that shouldn't have one.
+        c.setExtensionPrompt?.(INJECT_KEY, "", 1, 0, false, 0);
+
         if (!s.enabled || (!s.injectEnabled && !s.penaltyEnabled)) return;
         if (!Array.isArray(chat) || chat.length === 0) return;
 
@@ -943,16 +949,17 @@ globalThis.slopKillerInterceptor = async function (chat, _contextSize, _abort, t
             const template = s.injectTemplate || DEFAULT_SETTINGS.injectTemplate;
             const mes = buildInjectionText(template, banned, slop);
             if (mes) {
-                const note = {
-                    is_user: false,
-                    name: "System",
-                    send_date: Date.now(),
-                    mes,
-                };
-                // Insert at depth 0 — AFTER the last (user) message, as the final
-                // thing the model reads before generating. Models follow a system
-                // note here far more reliably than when it sits one turn back.
-                chat.splice(chat.length, 0, note);
+                if (typeof c.setExtensionPrompt === "function") {
+                    // Official injection: IN_CHAT(1) at depth 0 with role SYSTEM(0).
+                    // A real system message right before generation is followed far
+                    // more reliably than an assistant-role note spliced into the chat.
+                    c.setExtensionPrompt(INJECT_KEY, mes, 1, 0, false, 0);
+                } else {
+                    // Fallback for older builds without setExtensionPrompt.
+                    chat.splice(chat.length, 0, {
+                        is_user: false, name: "System", send_date: Date.now(), mes,
+                    });
+                }
             }
         }
 
