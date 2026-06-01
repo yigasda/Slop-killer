@@ -50,10 +50,10 @@ const DEFAULT_SETTINGS = Object.freeze({
     injectEnabled: true,
     maxInject: 12,      // max phrases sent to the model
     injectTemplate:
-        "[System note — writing variety]\n" +
-        "STRICTLY FORBIDDEN — Under no circumstances, never write these phrases or any close variation, under any circumstance: {{banned}}.\n" +
-        "Also avoid overusing these repeated phrases, or close paraphrases: {{slop}}.\n" +
-        "Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
+        "[System note — writing variety · hard constraint]\n" +
+        "BANNED for this reply — do NOT write any of these, in any language, and do NOT swap in a synonym, translation, or paraphrase that names the same thing (rephrase around the idea or refer to it indirectly instead): {{banned}}\n" +
+        "Also stop overusing these repeated phrases or close variants: {{slop}}\n" +
+        "Check each sentence as you write it, then vary your sentence structure, wording, and sensory detail.",
     highlightEnabled: true,
     highlightColor: "#ff6b6b",
     dragToBan: true,    // drag-select chat text → quick-add-to-banned popup
@@ -113,6 +113,10 @@ const LEGACY_INJECT_TEMPLATES = new Set([
     "[System note — writing variety] Avoid reusing the following overused phrases, or any close paraphrase, in your next reply: {{phrases}}. Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
     "[System note — writing variety]\n" +
         "STRICTLY FORBIDDEN — never write these phrases or any close variation, under any circumstance: {{banned}}.\n" +
+        "Also avoid overusing these repeated phrases, or close paraphrases: {{slop}}.\n" +
+        "Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
+    "[System note — writing variety]\n" +
+        "STRICTLY FORBIDDEN — Under no circumstances, never write these phrases or any close variation, under any circumstance: {{banned}}.\n" +
         "Also avoid overusing these repeated phrases, or close paraphrases: {{slop}}.\n" +
         "Vary your sentence structure and reach for fresh wording and new sensory detail instead.",
 ]);
