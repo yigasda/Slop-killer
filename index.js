@@ -949,7 +949,10 @@ globalThis.slopKillerInterceptor = async function (chat, _contextSize, _abort, t
                     send_date: Date.now(),
                     mes,
                 };
-                chat.splice(chat.length - 1, 0, note);
+                // Insert at depth 0 — AFTER the last (user) message, as the final
+                // thing the model reads before generating. Models follow a system
+                // note here far more reliably than when it sits one turn back.
+                chat.splice(chat.length, 0, note);
             }
         }
 
