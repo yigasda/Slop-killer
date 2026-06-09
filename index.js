@@ -376,6 +376,21 @@ function maskIgnored(text) {
     return out;
 }
 
+// Offset ranges [start, end) of every ignored region in `text` — used to keep a
+// reroll's rewrite span from reaching into a status panel and mangling it.
+function ignoredRegions(text) {
+    const regions = [];
+    for (const re of compileIgnoreRegexes()) {
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+            regions.push([m.index, m.index + m[0].length]);
+            if (m[0].length === 0) re.lastIndex++;
+        }
+    }
+    return regions;
+}
+
 function computeCounts() {
     const s = getSettings();
     const stop = effectiveStopwords();
@@ -866,7 +881,14 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
     // one at a time. expandBoundsForAllBanned used to grab whole paragraphs when
     // multiple banned phrases sat nearby, giving the model a huge span to rewrite
     // and causing sentence-count explosions.
-    const { start, end } = sentenceBoundsAt(text, pos);
+    let { start, end } = sentenceBoundsAt(text, pos);
+    // Clip the span so it never reaches into an ignored region (status panel etc.).
+    // A banned phrase never sits inside one (masked search), so every region is
+    // wholly before or wholly after `pos`; shrink the span to the gap around pos.
+    for (const [iStart, iEnd] of ignoredRegions(text)) {
+        if (iEnd <= pos)        start = Math.max(start, iEnd);
+        else if (iStart >= pos) end   = Math.min(end, iStart);
+    }
     const before = text.slice(0, start);
     const target = text.slice(start, end);
     const after = text.slice(end);
