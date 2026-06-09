@@ -67,6 +67,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     global: { banned: [], allowed: [] },   // applied across every character
     activeTab: "banned",                   // remembered between sessions
     customStopwords: "",                   // user stopwords (comma/newline separated)
+    ignoreRegexes: "",                     // regex patterns (one per line) whose matched
+                                           // regions are excluded from detect/highlight/reroll
     detectPresets: {},                     // name -> { minN, maxN, threshold, scanDepth, customStopwords }
 });
 
@@ -336,6 +338,44 @@ function effectiveStopwords() {
 // while the most frequent surface form is kept as the display representative.
 // Tokenization is sentence-aware: n-grams never cross sentence boundaries,
 // which prevents short-sentence languages (Korean) from producing only 2-grams.
+// User-supplied regexes whose matched regions are excluded from detection,
+// highlighting, and reroll (e.g. status panels). Accepts raw patterns (one per
+// line) or the /pattern/flags form; invalid lines are skipped silently.
+// Raw patterns get the "gs" flags so ".*?" spans newlines (status windows are
+// usually multi-line) and every occurrence is matched.
+function compileIgnoreRegexes() {
+    const raw = getSettings().ignoreRegexes || "";
+    const out = [];
+    for (const lineRaw of raw.split("\n")) {
+        const line = lineRaw.trim();
+        if (!line) continue;
+        try {
+            const delim = line.match(/^\/(.*)\/([a-z]*)$/i);
+            if (delim) {
+                let flags = delim[2];
+                if (!flags.includes("g")) flags += "g";
+                out.push(new RegExp(delim[1], flags));
+            } else {
+                out.push(new RegExp(line, "gs"));
+            }
+        } catch { /* invalid pattern — skip */ }
+    }
+    return out;
+}
+
+// Replace each ignored region with spaces of EQUAL length so character offsets
+// stay valid (reroll splices by index; highlight maps node offsets 1:1).
+function maskIgnored(text) {
+    const pats = compileIgnoreRegexes();
+    if (!pats.length) return text;
+    let out = String(text);
+    for (const re of pats) {
+        re.lastIndex = 0;
+        out = out.replace(re, m => " ".repeat(m.length));
+    }
+    return out;
+}
+
 function computeCounts() {
     const s = getSettings();
     const stop = effectiveStopwords();
@@ -349,7 +389,7 @@ function computeCounts() {
     // it matches what users consider the "main text" and what the ban regex targets.
     const agg = new Map();
     for (const m of msgs) {
-        for (const surf of tokenizeSentences(m.mes)) {
+        for (const surf of tokenizeSentences(maskIgnored(m.mes))) {
             const norm = surf.map(stripKoSuffix);
             for (let n = s.minN; n <= s.maxN; n++) {
                 for (let i = 0; i + n <= surf.length; i++) {
@@ -387,7 +427,7 @@ function countOccurrencesInChat(phrase) {
     const re = new RegExp(escapeRe(needle), "gi");
     let n = 0;
     for (const m of msgs) {
-        const matches = m.mes.match(re);
+        const matches = maskIgnored(m.mes).match(re);
         if (matches) n += matches.length;
     }
     return n;
@@ -817,7 +857,9 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
     const cur = c.chat[mesId];
     if (!cur) return { done: true };
     const text = cur.mes;
-    const pos = earliestBannedPos(text, phrases, minPos);
+    // Find banned positions in the IGNORE-MASKED copy (same length → indices align
+    // with the real text) so phrases inside status panels etc. are never targeted.
+    const pos = earliestBannedPos(maskIgnored(text), phrases, minPos);
     if (pos < 0) return { done: true };                // nothing to do at/after minPos
 
     // Use the single sentence only — the outer loop handles subsequent occurrences
@@ -864,7 +906,7 @@ async function maybeReroll(rawId) {
 
     const phrases = mergedBanned();
     if (phrases.length === 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 금지어 없음`); return; }
-    if (earliestBannedPos(msg.mes, phrases) < 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 메시지에 금지 표현 없음`); return; }
+    if (earliestBannedPos(maskIgnored(msg.mes), phrases) < 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 메시지에 금지 표현 없음(제외 영역 밖)`); return; }
 
     // HARD_CAP is an absolute ceiling on LLM calls per message so a reply that is
     // dense with banned phrases can't trigger a runaway loop. It is intentionally
@@ -889,7 +931,7 @@ async function maybeReroll(rawId) {
     try {
         while (calls < HARD_CAP) {
             const cur = c.chat[mesId];
-            if (!cur || earliestBannedPos(cur.mes, phrases, floor) < 0) {
+            if (!cur || earliestBannedPos(maskIgnored(cur.mes), phrases, floor) < 0) {
                 console.log("[SlopKiller] 금지 표현 제거 완료 (남은 구간 없음)");
                 break;
             }
@@ -1017,18 +1059,21 @@ function highlightInElement(root, phrases) {
 
     for (const node of nodes) {
         const text = node.nodeValue;
+        // Match against the ignore-masked copy (equal length → indices align with
+        // `text`) so phrases inside a status panel within this node aren't colored.
+        const scan = maskIgnored(text);
         re.lastIndex = 0;
-        if (!re.test(text)) continue;
+        if (!re.test(scan)) continue;
 
         re.lastIndex = 0;
         const frag = document.createDocumentFragment();
         let last = 0, m;
-        while ((m = re.exec(text)) !== null) {
+        while ((m = re.exec(scan)) !== null) {
             if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
             const span = document.createElement("span");
             span.className = "slop-hl";
             span.title = "반복된 표현";
-            span.textContent = m[0];
+            span.textContent = text.slice(m.index, m.index + m[0].length);
             frag.appendChild(span);
             last = m.index + m[0].length;
             if (m[0].length === 0) re.lastIndex++;
@@ -1427,6 +1472,12 @@ function buildPanel() {
                     <p class="sk_hint">캐릭터 이름이나 자주 쓰는 호칭을 넣으면 반복 후보에서 빠집니다.</p>
 
                     <hr>
+                    <h4><i class="fa-solid fa-eye-slash sk_h4_icon"></i>감지 제외 영역 (정규식)</h4>
+                    <label>이 정규식에 걸리는 부분은 감지·하이라이트·리롤에서 통째로 무시 (한 줄에 하나)</label>
+                    <textarea id="sk_ignoreRegexes" class="text_pole sk_template" rows="3" spellcheck="false" placeholder="\\[Status\\|.*?\\]&#10;<damian_status>.*?</damian_status>">${escapeHtml(s.ignoreRegexes)}</textarea>
+                    <p class="sk_hint">상태창처럼 매번 반복되는 영역을 제외할 때 씁니다. 줄바꿈을 넘는 영역도 <code>.*?</code>로 잡힙니다. <code>/패턴/플래그</code> 형식도 가능. 잘못된 정규식 줄은 무시됩니다.</p>
+
+                    <hr>
                     <h4><i class="fa-solid fa-bookmark sk_h4_icon"></i>프리셋</h4>
                     <p class="sk_hint">현재 감지 슬라이더 + 불용어 설정을 묶음으로 저장합니다.</p>
                     <div class="sk_preset_row">
@@ -1759,6 +1810,12 @@ function bindPanel() {
     if (csEl) {
         csEl.addEventListener("input",  () => { s.customStopwords = csEl.value; });
         csEl.addEventListener("change", () => { save(); rerender(); });
+    }
+
+    const igEl = document.getElementById("sk_ignoreRegexes");
+    if (igEl) {
+        igEl.addEventListener("input",  () => { s.ignoreRegexes = igEl.value; });
+        igEl.addEventListener("change", () => { save(); rerender(); });
     }
 
     bindPresets();
