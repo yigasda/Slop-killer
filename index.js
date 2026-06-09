@@ -1467,15 +1467,21 @@ function buildPanel() {
 
                     <hr>
                     <h4><i class="fa-solid fa-filter sk_h4_icon"></i>불용어</h4>
-                    <label>감지에서 무시할 단어 (쉼표·줄바꿈 구분)</label>
-                    <textarea id="sk_customStopwords" class="text_pole sk_template" rows="2" spellcheck="false">${escapeHtml(s.customStopwords)}</textarea>
                     <p class="sk_hint">캐릭터 이름이나 자주 쓰는 호칭을 넣으면 반복 후보에서 빠집니다.</p>
+                    <div class="sk_ban_row">
+                        <input id="sk_stopword_input" type="text" class="text_pole" placeholder="감지에서 무시할 단어">
+                        <button id="sk_stopword_add" class="menu_button">추가</button>
+                    </div>
+                    <div id="sk_stopword_list" class="sk_list"></div>
 
                     <hr>
                     <h4><i class="fa-solid fa-eye-slash sk_h4_icon"></i>감지 제외 영역 (정규식)</h4>
-                    <label>이 정규식에 걸리는 부분은 감지·하이라이트·리롤에서 통째로 무시 (한 줄에 하나)</label>
-                    <textarea id="sk_ignoreRegexes" class="text_pole sk_template" rows="3" spellcheck="false" placeholder="\\[Status\\|.*?\\]&#10;<damian_status>.*?</damian_status>">${escapeHtml(s.ignoreRegexes)}</textarea>
-                    <p class="sk_hint">상태창처럼 매번 반복되는 영역을 제외할 때 씁니다. 줄바꿈을 넘는 영역도 <code>.*?</code>로 잡힙니다. <code>/패턴/플래그</code> 형식도 가능. 잘못된 정규식 줄은 무시됩니다.</p>
+                    <p class="sk_hint">상태창처럼 반복되는 영역을 정규식으로 제외합니다. 감지·하이라이트·리롤에서 통째로 무시됩니다. 줄바꿈을 넘는 영역도 <code>.*?</code>로 잡힙니다. <code>/패턴/플래그</code> 형식도 가능.</p>
+                    <div class="sk_ban_row">
+                        <input id="sk_ignore_input" type="text" class="text_pole" placeholder="예: \\[Status\\|.*?\\]">
+                        <button id="sk_ignore_add" class="menu_button">추가</button>
+                    </div>
+                    <div id="sk_ignore_list" class="sk_list"></div>
 
                     <hr>
                     <h4><i class="fa-solid fa-bookmark sk_h4_icon"></i>프리셋</h4>
@@ -1615,7 +1621,6 @@ function bindPresets() {
     const s = getSettings();
     const presetSel  = document.getElementById("sk_preset_select");
     const presetName = document.getElementById("sk_preset_name");
-    const csEl       = document.getElementById("sk_customStopwords");
 
     function renderPresetSelect(selectedName) {
         if (!presetSel) return;
@@ -1643,7 +1648,7 @@ function bindPresets() {
             if (el)  el.value = s[k];
             if (lbl) lbl.textContent = String(s[k]);
         }
-        if (csEl) csEl.value = s.customStopwords || "";
+        renderDetectLists();
     }
 
     document.getElementById("sk_preset_save")?.addEventListener("click", () => {
@@ -1806,17 +1811,17 @@ function bindPanel() {
     bindSlider("sk_threshold",  "threshold",  parseInt,    rerender);
     bindSlider("sk_scanDepth",  "scanDepth",  parseInt,    rerender);
 
-    const csEl = document.getElementById("sk_customStopwords");
-    if (csEl) {
-        csEl.addEventListener("input",  () => { s.customStopwords = csEl.value; });
-        csEl.addEventListener("change", () => { save(); rerender(); });
-    }
-
-    const igEl = document.getElementById("sk_ignoreRegexes");
-    if (igEl) {
-        igEl.addEventListener("input",  () => { s.ignoreRegexes = igEl.value; });
-        igEl.addEventListener("change", () => { save(); rerender(); });
-    }
+    const bindListInput = (inputId, btnId, key, splitRe) => {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const doAdd = () => {
+            if (input.value.trim()) { listSettingAdd(key, splitRe, input.value); input.value = ""; }
+        };
+        document.getElementById(btnId)?.addEventListener("click", doAdd);
+        input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doAdd(); } });
+    };
+    bindListInput("sk_stopword_input", "sk_stopword_add", "customStopwords", STOPWORD_SPLIT);
+    bindListInput("sk_ignore_input",   "sk_ignore_add",   "ignoreRegexes",   IGNORE_SPLIT);
 
     bindPresets();
 
@@ -1874,6 +1879,7 @@ function bindPanel() {
 function renderPanel() {
     renderRanking();
     renderChips();
+    renderDetectLists();
 }
 
 function renderRanking() {
@@ -1961,6 +1967,61 @@ function renderChipBox(id, list, kind, scope, filter) {
             if (scope === "char") promoteToGlobal(b.dataset.p, kind);
             else demoteToCharacter(b.dataset.p, kind);
         }));
+}
+
+// ---- Simple string-backed lists (stopwords, ignore regexes) ----
+// Stored as one string; rendered as an add-input + removable row list, mirroring
+// the banned-phrase UI (minus search/sort and the scope-move arrow).
+function parseListSetting(str, splitRe) {
+    const seen = new Set(), out = [];
+    for (const item of String(str || "").split(splitRe)) {
+        const v = item.trim();
+        if (v && !seen.has(v)) { seen.add(v); out.push(v); }
+    }
+    return out;
+}
+
+function listSettingAdd(key, splitRe, value) {
+    const v = String(value).trim();
+    if (!v) return;
+    const items = parseListSetting(getSettings()[key], splitRe);
+    if (!items.includes(v)) items.push(v);
+    getSettings()[key] = items.join("\n");
+    save(); renderPanel(); refreshAllHighlights();
+}
+
+function listSettingRemove(key, splitRe, value) {
+    const items = parseListSetting(getSettings()[key], splitRe).filter(x => x !== value);
+    getSettings()[key] = items.join("\n");
+    save(); renderPanel(); refreshAllHighlights();
+}
+
+function renderSimpleList(boxId, items, onRemove) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    if (!items.length) { box.innerHTML = `<div class="sk_list_empty">없음</div>`; return; }
+    box.innerHTML = items.map(p => {
+        const esc = escapeHtml(p);
+        return `<div class="sk_list_row">
+            <span class="sk_list_text" title="${esc}">${esc}</span>
+            <button class="sk_list_remove" data-p="${esc}" title="제거">×</button>
+        </div>`;
+    }).join("");
+    box.querySelectorAll(".sk_list_remove").forEach(b =>
+        b.addEventListener("click", () => onRemove(b.dataset.p)));
+}
+
+// Stopwords split on newline OR comma (legacy values were comma-separated);
+// regexes split on newline only (a pattern may legitimately contain commas).
+const STOPWORD_SPLIT = /[\n,]/;
+const IGNORE_SPLIT   = /\n/;
+
+function renderDetectLists() {
+    const s = getSettings();
+    renderSimpleList("sk_stopword_list", parseListSetting(s.customStopwords, STOPWORD_SPLIT),
+        v => listSettingRemove("customStopwords", STOPWORD_SPLIT, v));
+    renderSimpleList("sk_ignore_list", parseListSetting(s.ignoreRegexes, IGNORE_SPLIT),
+        v => listSettingRemove("ignoreRegexes", IGNORE_SPLIT, v));
 }
 
 // ====================================================================
