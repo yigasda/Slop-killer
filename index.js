@@ -1466,6 +1466,15 @@ function buildPanel() {
                     <p class="sk_hint">한국어는 조사·어미 때문에 2단어 조합이 노이즈가 많습니다. <b>최소 3단어</b>를 권장합니다.</p>
 
                     <hr>
+                    <h4><i class="fa-solid fa-eye-slash sk_h4_icon"></i>감지 제외 영역 (정규식)</h4>
+                    <p class="sk_hint">상태창처럼 반복되는 영역을 정규식으로 제외합니다. 줄바꿈을 넘는 영역도 <code>.*?</code>로 잡힙니다. <code>/패턴/플래그</code> 형식도 가능.</p>
+                    <div class="sk_ban_row">
+                        <input id="sk_ignore_input" type="text" class="text_pole" placeholder="예: <status>.*?</status>">
+                        <button id="sk_ignore_add" class="menu_button">추가</button>
+                    </div>
+                    <div id="sk_ignore_list" class="sk_list"></div>
+
+                    <hr>
                     <h4><i class="fa-solid fa-filter sk_h4_icon"></i>불용어</h4>
                     <p class="sk_hint">캐릭터 이름이나 자주 쓰는 호칭을 넣으면 반복 후보에서 빠집니다.</p>
                     <div class="sk_ban_row">
@@ -1473,15 +1482,6 @@ function buildPanel() {
                         <button id="sk_stopword_add" class="menu_button">추가</button>
                     </div>
                     <div id="sk_stopword_list" class="sk_list"></div>
-
-                    <hr>
-                    <h4><i class="fa-solid fa-eye-slash sk_h4_icon"></i>감지 제외 영역 (정규식)</h4>
-                    <p class="sk_hint">상태창처럼 반복되는 영역을 정규식으로 제외합니다. 감지·하이라이트·리롤에서 통째로 무시됩니다. 줄바꿈을 넘는 영역도 <code>.*?</code>로 잡힙니다. <code>/패턴/플래그</code> 형식도 가능.</p>
-                    <div class="sk_ban_row">
-                        <input id="sk_ignore_input" type="text" class="text_pole" placeholder="예: \\[Status\\|.*?\\]">
-                        <button id="sk_ignore_add" class="menu_button">추가</button>
-                    </div>
-                    <div id="sk_ignore_list" class="sk_list"></div>
 
                     <hr>
                     <h4><i class="fa-solid fa-bookmark sk_h4_icon"></i>프리셋</h4>
