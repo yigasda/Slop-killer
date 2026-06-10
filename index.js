@@ -1090,8 +1090,9 @@ function highlightInElement(root, phrases) {
         while (el && el !== root) {
             const tag = el.tagName;
             if (tag === "STYLE" || tag === "SCRIPT" || tag === "TABLE" || tag === "SVG" ||
-                tag === "DETAILS" || tag === "SUMMARY" || tag === "BUTTON") return true;
-            if (el.getAttribute && (el.getAttribute("class") || el.getAttribute("style"))) return true;
+                tag === "DETAILS" || tag === "SUMMARY" || tag === "BUTTON" || tag === "INPUT" ||
+                tag === "LABEL") return true;
+            if (el.getAttribute && (el.getAttribute("class") || el.getAttribute("style") || el.id)) return true;
             el = el.parentElement;
         }
         return false;
