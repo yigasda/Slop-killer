@@ -1079,9 +1079,10 @@ function highlightInElement(root, phrases) {
     const re = buildPhraseRegex(phrases);
     if (!re) return;
 
+    // Keep every text node (even whitespace) so concatenated offsets line up with
+    // the full rendered text; only skip nodes already inside a highlight span.
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
-            if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
             if (node.parentElement?.closest(".slop-hl")) return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
         },
@@ -1090,11 +1091,20 @@ function highlightInElement(root, phrases) {
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
 
+    // Mask ignored regions across the WHOLE rendered text, not per node — a status
+    // panel rendered as a widget is split into several text nodes, so per-node
+    // masking would miss it and the highlighter would wrap spans inside it.
+    const fullText = nodes.map(n => n.nodeValue).join("");
+    const maskedFull = maskIgnored(fullText);
+
+    let offset = 0;
     for (const node of nodes) {
         const text = node.nodeValue;
-        // Match against the ignore-masked copy (equal length → indices align with
-        // `text`) so phrases inside a status panel within this node aren't colored.
-        const scan = maskIgnored(text);
+        const nodeStart = offset;
+        offset += text.length;
+        if (!text.trim()) continue;
+        // Masked view of just this node (indices align with `text`).
+        const scan = maskedFull.slice(nodeStart, nodeStart + text.length);
         re.lastIndex = 0;
         if (!re.test(scan)) continue;
 
