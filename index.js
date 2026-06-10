@@ -1079,11 +1079,30 @@ function highlightInElement(root, phrases) {
     const re = buildPhraseRegex(phrases);
     if (!re) return;
 
+    // Skip text inside rendered HTML widgets (e.g. a [Status|…] panel that a regex
+    // script turned into a styled <div class="csw-root">…). Such widgets always
+    // carry class/style attributes (or are style/script/table/svg), whereas plain
+    // markdown prose (<p>, <em>, <strong>, bare text) does not — so we never color
+    // inside them and can't break their markup. Detection/reroll run on the raw
+    // message text and are unaffected.
+    const inRenderedWidget = (node) => {
+        let el = node.parentElement;
+        while (el && el !== root) {
+            const tag = el.tagName;
+            if (tag === "STYLE" || tag === "SCRIPT" || tag === "TABLE" || tag === "SVG" ||
+                tag === "DETAILS" || tag === "SUMMARY" || tag === "BUTTON") return true;
+            if (el.getAttribute && (el.getAttribute("class") || el.getAttribute("style"))) return true;
+            el = el.parentElement;
+        }
+        return false;
+    };
+
     // Keep every text node (even whitespace) so concatenated offsets line up with
-    // the full rendered text; only skip nodes already inside a highlight span.
+    // the full rendered text; skip nodes already inside a highlight span or a widget.
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
             if (node.parentElement?.closest(".slop-hl")) return NodeFilter.FILTER_REJECT;
+            if (inRenderedWidget(node)) return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
         },
     });
