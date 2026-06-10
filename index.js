@@ -899,12 +899,23 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
 
     const needsLeadingSpace = before.length && !/\s$/.test(before) && !/^\s/.test(newTarget);
     const needsTrailingSpace = after.length && !/^\s/.test(after) && !/\s$/.test(newTarget);
-    cur.mes =
+    const newText =
         before +
         (needsLeadingSpace ? " " : "") +
         newTarget +
         (needsTrailingSpace ? " " : "") +
         after;
+
+    // Hard guarantee: a reroll must NEVER alter an ignored region (status panel).
+    // Compare the multiset of ignored-region contents before vs after; if anything
+    // changed (or a new match appeared), discard this rewrite and skip the spot.
+    const regionSig = (t) => ignoredRegions(t).map(([a, b]) => t.slice(a, b)).sort().join(" ");
+    if (regionSig(text) !== regionSig(newText)) {
+        console.warn("[SlopKiller] 리롤 결과가 제외 영역(상태창)을 건드림 — 폐기");
+        return { changed: false, sentEnd: end };
+    }
+
+    cur.mes = newText;
     c.updateMessageBlock(mesId, cur);
     await c.saveChat();
     return { changed: true, sentEnd: start + newTarget.length };
