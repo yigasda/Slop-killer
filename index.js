@@ -917,6 +917,12 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
 
     cur.mes = newText;
     c.updateMessageBlock(mesId, cur);
+    // updateMessageBlock sets innerHTML via .html(), which does NOT run embedded
+    // <script> tags — so status-panel widgets (rendered from [Status|…] by a regex
+    // script + script) come out lifeless after a reroll. Emitting MESSAGE_UPDATED
+    // re-runs the same post-render pipeline that message-edit-save uses, reviving them.
+    try { await c.eventSource?.emit?.(c.event_types?.MESSAGE_UPDATED ?? "message_updated", mesId); }
+    catch (e) { console.warn("[SlopKiller] MESSAGE_UPDATED emit 실패:", e?.message ?? e); }
     await c.saveChat();
     return { changed: true, sentEnd: start + newTarget.length };
 }
