@@ -897,12 +897,19 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
     const newTarget = await rewriteFull(c, before, target, after, phrases);
     if (newTarget === null) return { changed: false, sentEnd: end };
 
-    const needsLeadingSpace = before.length && !/\s$/.test(before) && !/^\s/.test(newTarget);
-    const needsTrailingSpace = after.length && !/^\s/.test(after) && !/\s$/.test(newTarget);
+    // Preserve paragraph-separating newlines: sentenceBoundsAt places `end`
+    // after the trailing \n+ boundary, so `target` carries those newlines.
+    // Re-splice them so a reroll never collapses blank lines between paragraphs.
+    const leadingWS  = target.match(/^\s*/)[0];
+    const trailingWS = target.match(/\s*$/)[0];
+    const needsLeadingSpace  = !leadingWS  && before.length && !/\s$/.test(before) && !/^\s/.test(newTarget);
+    const needsTrailingSpace = !trailingWS && after.length  && !/^\s/.test(after)  && !/\s$/.test(newTarget);
     const newText =
         before +
-        (needsLeadingSpace ? " " : "") +
+        (needsLeadingSpace  ? " " : "") +
+        leadingWS +
         newTarget +
+        trailingWS +
         (needsTrailingSpace ? " " : "") +
         after;
 
