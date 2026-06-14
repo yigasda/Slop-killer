@@ -2317,6 +2317,45 @@ jQuery(() => {
             "GENERATION_ENDED=", event_types?.GENERATION_ENDED);
 
         getSettings();
+
+        // 진단용 전역 — 콘솔에서 slopKillerDebug() 호출. LLM/리롤 호출 없음.
+        // 마지막 어시스턴트 메시지의 원문 vs 마스킹 결과, 컴파일된 정규식,
+        // 감지 상위 표현을 그대로 찍어서 상태창 누출 원인을 눈으로 확인한다.
+        globalThis.slopKillerDebug = function () {
+            const c = ctx();
+            const pats = compileIgnoreRegexes();
+            console.log("===== SlopKiller DEBUG =====");
+            console.log("ignoreRegexes(raw 설정):", JSON.stringify(getSettings().ignoreRegexes));
+            console.log("컴파일된 정규식 개수:", pats.length);
+            pats.forEach((re, i) => console.log(`  [${i}] source=${JSON.stringify(re.source)} flags=${JSON.stringify(re.flags)}`));
+
+            const msgs = (c.chat || []).filter(m => m && !m.is_user && !m.is_system && typeof m.mes === "string" && m.mes.trim());
+            const m = msgs[msgs.length - 1];
+            if (!m) { console.log("어시스턴트 메시지 없음"); return; }
+            const raw = m.mes;
+            console.log("\n--- 마지막 어시스턴트 메시지 ---");
+            console.log("길이:", raw.length);
+            console.log("raw(JSON, 앞 600):", JSON.stringify(raw.slice(0, 600)));
+            console.log("status_block 포함?", raw.includes("<status_block>"), "/ </status_block> 포함?", raw.includes("</status_block>"));
+
+            const regions = ignoredRegions(raw).sort((a, b) => a[0] - b[0]);
+            console.log("\n매칭된 제외 영역 개수:", regions.length);
+            regions.forEach(([a, b], i) => console.log(`  영역[${i}] [${a},${b}) = ${JSON.stringify(raw.slice(a, b).slice(0, 60))}…`));
+
+            const masked = maskIgnored(raw);
+            // 마스킹 후에도 남아있는, 상태창에서 나왔을 법한 키워드 확인
+            const leakWords = ["flag", "beneath", "outfit", "status", "block", "time:", "location", "state"];
+            const leaked = leakWords.filter(w => masked.includes(w));
+            console.log("\n마스킹 후 남은 의심 키워드:", JSON.stringify(leaked));
+            console.log("masked(JSON, 앞 600):", JSON.stringify(masked.slice(0, 600)));
+
+            console.log("\n--- 감지 상위 20 (computeCounts) ---");
+            const top = [...computeCounts().entries()].sort((x, y) => y[1] - x[1]).slice(0, 20);
+            top.forEach(([k, v]) => console.log(`  ${v}\t${JSON.stringify(k)}`));
+            console.log("============================");
+            return { regexCount: pats.length, regions: regions.length, leaked };
+        };
+
         applyColor();
         buildPanel();
         applyTheme();
