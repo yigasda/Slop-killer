@@ -391,6 +391,37 @@ function ignoredRegions(text) {
     return regions;
 }
 
+// Replace every ignored region (status panel) in `text` with an opaque sentinel
+// marker (⟦P0⟧, ⟦P1⟧, …) and return the masked text plus the ordered marker→content
+// map for later restoration. Regions separated only by whitespace (e.g. the stray
+// "\n" between a [Status|…] block and an adjacent <damian_status>…</damian_status>)
+// are MERGED first, so that gap isn't left exposed as prose. Used by the surgical
+// reroll: working in this "sentinel space" means the model never sees a panel,
+// punctuation/newlines INSIDE a panel can't be mistaken for sentence boundaries,
+// and a panel sitting mid-sentence no longer forces the sentence to be cut in half.
+const SENTINEL_RE = /⟦P\d+⟧/g;
+function maskWithSentinels(text) {
+    let regions = ignoredRegions(text).sort((p, q) => p[0] - q[0]);
+    if (!regions.length) return { mtext: text, ph: [] };
+    const merged = [];
+    for (const [a, b] of regions) {
+        const last = merged[merged.length - 1];
+        if (last && text.slice(last[1], a).trim() === "") last[1] = b;
+        else merged.push([a, b]);
+    }
+    regions = merged;
+    let mtext = "", cur = 0;
+    const ph = [];
+    regions.forEach(([a, b], i) => {
+        const tok = `⟦P${i}⟧`;
+        mtext += text.slice(cur, a) + tok;
+        ph.push([tok, text.slice(a, b)]);
+        cur = b;
+    });
+    mtext += text.slice(cur);
+    return { mtext, ph };
+}
+
 function computeCounts() {
     const s = getSettings();
     const stop = effectiveStopwords();
@@ -676,6 +707,7 @@ function buildRewritePrompt(before, target, after, phrases) {
         "- Keep it to ONE rewritten passage with the SAME number of sentences. Do NOT add sentences or invent new events or details.",
         "- Keep the SAME language. Do not translate. Stay close to the original length.",
         "- Do NOT add or remove brackets [ ], quotation marks, asterisks, or any framing punctuation that is not already in the passage.",
+        "- The passage may contain protected markers like ⟦P0⟧, ⟦P1⟧. These stand for fixed content you must NOT touch. Keep every marker EXACTLY as written, the same number of times, in its original position. Never delete, translate, merge, reorder, or alter a marker — write the surrounding prose so it still reads naturally around it.",
         "- Output ONLY the rewritten passage. No greeting, explanation, quotes, or labels.",
         "",
         "Examples (illustration only — notice the banned phrase is removed AND the surrounding wording is adjusted to flow naturally):",
@@ -879,30 +911,43 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
     const cur = c.chat[mesId];
     if (!cur) return { done: true };
     const text = cur.mes;
-    // Find banned positions in the IGNORE-MASKED copy (same length → indices align
-    // with the real text) so phrases inside status panels etc. are never targeted.
-    const pos = earliestBannedPos(maskIgnored(text), phrases, minPos);
+
+    // Work in "sentinel space": swap every status panel for an opaque marker BEFORE
+    // locating the sentence. This way a panel embedded mid-sentence (no newline
+    // around it) is treated as a single opaque token instead of forcing us to cut
+    // the sentence at the panel boundary — the old clipping did exactly that and
+    // handed the model a truncated fragment, which it returned as broken prose
+    // (e.g. "…상황은 데미" with the rest of the sentence gone).
+    const { mtext, ph } = maskWithSentinels(text);
+
+    const pos = earliestBannedPos(mtext, phrases, minPos);
     if (pos < 0) return { done: true };                // nothing to do at/after minPos
 
     // Use the single sentence only — the outer loop handles subsequent occurrences
     // one at a time. expandBoundsForAllBanned used to grab whole paragraphs when
     // multiple banned phrases sat nearby, giving the model a huge span to rewrite
     // and causing sentence-count explosions.
-    let { start, end } = sentenceBoundsAt(text, pos);
-    // Clip the span so it never reaches into an ignored region (status panel etc.).
-    // A banned phrase never sits inside one (masked search), so every region is
-    // wholly before or wholly after `pos`; shrink the span to the gap around pos.
-    for (const [iStart, iEnd] of ignoredRegions(text)) {
-        if (iEnd <= pos)        start = Math.max(start, iEnd);
-        else if (iStart >= pos) end   = Math.min(end, iStart);
-    }
-    const before = text.slice(0, start);
-    const target = text.slice(start, end);
-    const after = text.slice(end);
-    if (!target.trim()) return { changed: false, sentEnd: end };
+    const { start, end } = sentenceBoundsAt(mtext, pos);
+    const before = mtext.slice(0, start);
+    const target = mtext.slice(start, end);
+    const after = mtext.slice(end);
+    // Ignore markers when checking for actual prose to rewrite.
+    if (!target.replace(SENTINEL_RE, "").trim()) return { changed: false, sentEnd: end };
 
     const newTarget = await rewriteFull(c, before, target, after, phrases);
     if (newTarget === null) return { changed: false, sentEnd: end };
+
+    // The model MUST keep every protected marker that was in the target, untouched
+    // and in the same count. If it dropped, duplicated, or invented one, restoring
+    // would corrupt or lose a status panel → discard and skip this spot.
+    for (const [tok] of ph) {
+        const inTarget = target.split(tok).length - 1;
+        const inReply = newTarget.split(tok).length - 1;
+        if (inTarget !== inReply) {
+            console.warn(`[SlopKiller] 리롤이 보호 마커(${tok})를 변형함 (${inTarget}→${inReply}) — 폐기`);
+            return { changed: false, sentEnd: end };
+        }
+    }
 
     // Preserve paragraph-separating newlines: sentenceBoundsAt places `end`
     // after the trailing \n+ boundary, so `target` carries those newlines.
@@ -911,7 +956,7 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
     const trailingWS = target.match(/\s*$/)[0];
     const needsLeadingSpace  = !leadingWS  && before.length && !/\s$/.test(before) && !/^\s/.test(newTarget);
     const needsTrailingSpace = !trailingWS && after.length  && !/^\s/.test(after)  && !/\s$/.test(newTarget);
-    const newText =
+    let newText =
         before +
         (needsLeadingSpace  ? " " : "") +
         leadingWS +
@@ -920,10 +965,13 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
         (needsTrailingSpace ? " " : "") +
         after;
 
+    // Restore each protected marker back to its original status-panel content.
+    for (const [tok, orig] of ph) newText = newText.split(tok).join(orig);
+
     // Hard guarantee: a reroll must NEVER alter an ignored region (status panel).
     // Compare the multiset of ignored-region contents before vs after; if anything
     // changed (or a new match appeared), discard this rewrite and skip the spot.
-    const regionSig = (t) => ignoredRegions(t).map(([a, b]) => t.slice(a, b)).sort().join("");
+    const regionSig = (t) => ignoredRegions(t).map(([a, b]) => t.slice(a, b)).sort().join("");
     if (regionSig(text) !== regionSig(newText)) {
         console.warn("[SlopKiller] 리롤 결과가 제외 영역(상태창)을 건드림 — 폐기");
         return { changed: false, sentEnd: end };
@@ -959,7 +1007,7 @@ async function maybeReroll(rawId) {
 
     const phrases = mergedBanned();
     if (phrases.length === 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 금지어 없음`); return; }
-    if (earliestBannedPos(maskIgnored(msg.mes), phrases) < 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 메시지에 금지 표현 없음(제외 영역 밖)`); return; }
+    if (earliestBannedPos(maskWithSentinels(msg.mes).mtext, phrases) < 0) { console.log(`[SlopKiller] maybeReroll(${mesId}) 스킵: 메시지에 금지 표현 없음(제외 영역 밖)`); return; }
 
     // HARD_CAP is an absolute ceiling on LLM calls per message so a reply that is
     // dense with banned phrases can't trigger a runaway loop. It is intentionally
@@ -984,7 +1032,9 @@ async function maybeReroll(rawId) {
     try {
         while (calls < HARD_CAP) {
             const cur = c.chat[mesId];
-            if (!cur || earliestBannedPos(maskIgnored(cur.mes), phrases, floor) < 0) {
+            // Use sentinel space so `floor`/`sentEnd` offsets are consistent with
+            // rerollSurgically (which also locates sentences in sentinel space).
+            if (!cur || earliestBannedPos(maskWithSentinels(cur.mes).mtext, phrases, floor) < 0) {
                 console.log("[SlopKiller] 금지 표현 제거 완료 (남은 구간 없음)");
                 break;
             }
