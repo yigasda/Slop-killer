@@ -850,9 +850,16 @@ async function rewriteFull(c, before, target, after, phrases) {
     // Reject if much longer than the original — means the model invented extra content.
     if (replacement.length > target.length * 2 + 60) { console.warn(`[SlopKiller] 응답이 원본보다 너무 김 (원본 ${target.length}자, 응답 ${replacement.length}자) — 폐기`); return null; }
     // Reject if far SHORTER than the original — a truncated/fragment response
-    // (e.g. Gemini returning "현금 인") must not replace a whole sentence.
-    if (target.trim().length >= 12 && replacement.length < target.trim().length * 0.5) {
-        console.warn(`[SlopKiller] 응답이 원본보다 너무 짧음 (원본 ${target.trim().length}자, 응답 ${replacement.length}자) — 잘린 응답으로 보고 폐기`);
+    // (e.g. Gemini returning "현금 인", or a short sentence the model collapsed into
+    // a couple of words) must not replace a whole sentence. Compare REAL characters
+    // (letters/digits), NOT raw length: spaces, quotes and punctuation inflate the raw
+    // count and used to let half-truncated replies — and ANY reply to a sub-12-char
+    // sentence (the guard was disabled below that length) — slip through, wiping the
+    // sentence tail so only its opening words survived.
+    const realLen = (s) => (s.match(/[\p{L}\p{N}]/gu) || []).length;
+    const tReal = realLen(target), rReal = realLen(replacement);
+    if (tReal >= 4 && rReal < tReal * 0.6) {
+        console.warn(`[SlopKiller] 응답이 원본보다 너무 짧음 (원본 실질 ${tReal}자, 응답 실질 ${rReal}자) — 잘린 응답으로 보고 폐기`);
         return null;
     }
     // Reject if the sentence count jumped — model added sentences.
@@ -916,7 +923,7 @@ async function rerollSurgically(c, mesId, phrases, minPos = 0) {
     // Hard guarantee: a reroll must NEVER alter an ignored region (status panel).
     // Compare the multiset of ignored-region contents before vs after; if anything
     // changed (or a new match appeared), discard this rewrite and skip the spot.
-    const regionSig = (t) => ignoredRegions(t).map(([a, b]) => t.slice(a, b)).sort().join(" ");
+    const regionSig = (t) => ignoredRegions(t).map(([a, b]) => t.slice(a, b)).sort().join("");
     if (regionSig(text) !== regionSig(newText)) {
         console.warn("[SlopKiller] 리롤 결과가 제외 영역(상태창)을 건드림 — 폐기");
         return { changed: false, sentEnd: end };
