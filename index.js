@@ -692,14 +692,30 @@ function expandBoundsForAllBanned(text, phrases, initialBounds) {
     return { start, end };
 }
 
+// Dominant writing system of a passage. Used to force the rewrite to stay in the
+// SAME language — in a bilingual chat DeepSeek (and others) like to "rewrite" an
+// English line by translating the whole thing into Korean, or vice versa. Returns
+// "ko", "en", or null when the text is genuinely mixed / has no letters.
+const SCRIPT_NAME = { ko: "Korean (한국어)", en: "English" };
+function dominantScript(text) {
+    const ko = (String(text).match(/[가-힣]/g) || []).length;   // Hangul syllables
+    const en = (String(text).match(/[A-Za-z]/g) || []).length;          // Latin letters
+    if (ko === 0 && en === 0) return null;
+    if (ko >= en * 2) return "ko";
+    if (en >= ko * 2) return "en";
+    return null;   // genuinely mixed — don't force a language
+}
+
 // REWRITE mode: paraphrase the whole passage, keeping meaning + emotional direction.
 function buildRewritePrompt(before, target, after, phrases) {
     const banList = phrases.map(p => `"${p}"`).join(", ");
     const ctxBefore = before.slice(-400).trim().replace(/[\r\n]+/g, " ");
     const ctxAfter = after.slice(0, 200).trim().replace(/[\r\n]+/g, " ");
     const targetLine = target.trim().replace(/[\r\n]+/g, " ");
+    const lang = dominantScript(target);
     return [
         `Task: rewrite the PASSAGE below naturally so it no longer uses ${banList}, while carrying the same meaning and emotional beat forward.`,
+        lang ? `- ⚠ CRITICAL LANGUAGE RULE: The PASSAGE is written in ${SCRIPT_NAME[lang]}. Your rewrite MUST be written ENTIRELY in ${SCRIPT_NAME[lang]}. Do NOT translate it into any other language. Even a single banned phrase in another language must be replaced with ${SCRIPT_NAME[lang]} — never switch the whole sentence to a different language. This rule overrides every other instruction.` : "",
         "- Replace the banned phrase AND freely reword the rest of the sentence so the new wording reads naturally together. You are NOT required to keep the other words unchanged — rework verbs, particles, and phrasing as needed. A bare word swap is acceptable only when it already reads perfectly.",
         "- Do NOT literally translate or give a dictionary definition of the banned word (e.g. do not turn 'ATM' into '현금인출기'). Write what a fluent native writer would actually say — often a demonstrative ('그 말', '그것', 'that') when it refers back to something already said.",
         "- Do NOT dodge the ban by re-encoding the SAME thing in another language or a thin synonym that paints the identical image (e.g. do not turn 'German dictionary' into 'die Verlegenheit', 'das Wörterbuch', or 'the German wordbook'; do not turn '칼' into 'a blade' or 'das Messer'). The underlying image/object itself must genuinely change, be referred to indirectly, or be dropped — never just swapped for its foreign-language or near-identical equivalent.",
@@ -879,6 +895,14 @@ async function rewriteFull(c, before, target, after, phrases) {
     if (looksLikeEcho(replacement, before, after)) { console.warn(`[SlopKiller] 모델이 컨텍스트 에코함 — 폐기: "${replacement.slice(0, 60)}"`); return null; }
     if (earliestBannedPos(replacement, phrases) >= 0) { console.warn("[SlopKiller] 응답에 금지 표현이 그대로 있음 — 폐기"); return null; }
     if (replacement.replace(/\s+/g, " ") === target.trim().replace(/\s+/g, " ")) { console.warn("[SlopKiller] 모델이 원문 그대로 반환함 — 폐기"); return null; }
+    // Reject a language switch: in a bilingual chat the model often "rewrites" an
+    // English sentence by translating the whole thing into Korean (or vice versa).
+    // Only fire when BOTH sides have a clear dominant script and they differ.
+    const tScript = dominantScript(target), rScript = dominantScript(replacement);
+    if (tScript && rScript && tScript !== rScript) {
+        console.warn(`[SlopKiller] 응답 언어가 원문과 다름 (원문 ${tScript} → 응답 ${rScript}) — 번역으로 보고 폐기`);
+        return null;
+    }
     // Reject if much longer than the original — means the model invented extra content.
     if (replacement.length > target.length * 2 + 60) { console.warn(`[SlopKiller] 응답이 원본보다 너무 김 (원본 ${target.length}자, 응답 ${replacement.length}자) — 폐기`); return null; }
     // Reject if far SHORTER than the original — a truncated/fragment response
